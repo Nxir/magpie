@@ -53,16 +53,13 @@ func requestSessionMetadata(h http.Header, body []byte) sessionMetadata {
 	return m
 }
 
-func requestCallKind(h http.Header, body []byte) string {
-	if kind := callKind(h); h.Get("x-openai-subagent") != "" || h.Get("x-openai-memgen-request") != "" {
-		return kind
-	}
-	m := requestSessionMetadata(h, body)
-	switch source := strings.TrimSpace(m.Source); source {
-	case "":
+func requestCallKind(h http.Header, m sessionMetadata) string {
+	if h.Get("x-openai-subagent") != "" || h.Get("x-openai-memgen-request") != "" {
 		return callKind(h)
-	case "user", "subagent":
-		return ""
+	}
+	switch source := strings.TrimSpace(m.Source); source {
+	case "", "user", "subagent":
+		return callKind(h)
 	default:
 		if len(source) > 40 {
 			source = source[:40]
@@ -73,11 +70,10 @@ func requestCallKind(h http.Header, body []byte) string {
 
 // Only title helpers inherit their originating chat. A user-created fork is a
 // separate conversation, even though it carries the same fork ancestry.
-func titleParentSession(h http.Header, body []byte, kind string) string {
+func titleParentSession(h http.Header, m sessionMetadata, kind string) string {
 	if !isTitleKind(kind) {
 		return ""
 	}
-	m := requestSessionMetadata(h, body)
 	for _, id := range []string{m.Parent, m.Forked, h.Get("x-codex-parent-thread-id")} {
 		id = strings.TrimSpace(id)
 		if id == "" || len(id) > 128 || strings.ContainsAny(id, "\r\n\t") || id == sessionOf(h) {

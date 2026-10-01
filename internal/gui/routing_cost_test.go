@@ -7,7 +7,6 @@ import (
 
 	"github.com/yetone/magpie/internal/gateway"
 	"github.com/yetone/magpie/internal/settings"
-	"github.com/yetone/magpie/internal/usage"
 )
 
 func TestRoutingEffectiveCosts(t *testing.T) {
@@ -24,11 +23,11 @@ func TestRoutingEffectiveCosts(t *testing.T) {
 	}
 	save(2)
 	routes := []gateway.Route{
-		{ID: 1, Session: "conversation", ParentSession: "parent-conversation", Usage: []usage.Record{
+		{ID: 1, Session: "conversation", ParentSession: "parent-conversation", Usage: []gateway.RouteUsage{
 			{Provider: "relay", Model: "m", Input: 2000, Output: 500, CacheRead: 4000, CacheWrite: 1000},
 			{Provider: "relay", Model: "m", Input: 1000, Output: 100},
 		}},
-		{ID: 2, Usage: []usage.Record{{Provider: "free", Model: "m", Input: 1000}}},
+		{ID: 2, Usage: []gateway.RouteUsage{{Provider: "free", Model: "m", Input: 1000}}},
 		{ID: 3, Tokens: 1000}, // old history: no token tiers, price unknown
 	}
 	got := pricedRoutes(routes)

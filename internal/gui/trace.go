@@ -43,7 +43,11 @@ func pricedRoutes(routes []gateway.Route) []routeJSON {
 	}
 	titles := sessions.CodexTitles(ids)
 	for _, r := range routes {
-		sum := priceOf(r.Usage)
+		recs := make([]usage.Record, len(r.Usage))
+		for i, u := range r.Usage {
+			recs[i] = u.PricingRecord()
+		}
+		sum := priceOf(recs)
 		// Old history and calls without token counts stay unknown, not free.
 		priced := sum.Calls > sum.Unpriced && sum.Input+sum.Output > 0
 		name := ""

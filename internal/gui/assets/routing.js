@@ -93,11 +93,16 @@
   // the days the history keeps on disk, to look back at one: see listed
   const dayBar = el("div", "rt-days");
   const groupBar = el("div", "rt-group-by");
-  let bySession = true;
+  let bySession = false;
+  try { bySession = localStorage.getItem("magpie.routingBySession") === "1"; } catch {}
   const groupButtons = [[false, "By request"], [true, "By session"]].map(([on, label]) => {
     const b = el("button", "rt-day");
     b.dataset.label = label;
-    b.onclick = () => { bySession = on; steady(renderHist); };
+    b.onclick = () => {
+      bySession = on;
+      try { localStorage.setItem("magpie.routingBySession", on ? "1" : "0"); } catch {}
+      steady(renderHist);
+    };
     groupBar.append(b);
     return b;
   });

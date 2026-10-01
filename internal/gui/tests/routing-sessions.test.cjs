@@ -51,6 +51,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.route("**/*", serve(lang, feed));
       t.after(async () => { feed.next?.([]); await browser.close(); });
       await page.goto("http://magpie.test/?view=routing");
+      await page.locator(".rt-group-by button").nth(1).click();
       await page.locator(".rt-session").nth(3).waitFor();
       const group = page.locator("button.rt-session").filter({ hasText: "Codex · conversation-a" });
       assert.equal(await page.locator(".rt-session").count(), 4, "identical IDs from different agents must not merge");
@@ -120,6 +121,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     await page.route("**/*", serve("zh", feed, fixture));
     t.after(async () => { feed.next?.([]); await browser.close(); });
     await page.goto("http://magpie.test/?view=routing");
+    await page.locator(".rt-group-by button").nth(1).click();
     const group = page.locator("button.rt-session").filter({ hasText: "Codex · main-a" });
     await group.waitFor();
     assert.equal(await page.locator(".rt-session").count(), 3);
@@ -152,4 +154,34 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     await page.locator(".rt-group-by button").first().click();
     assert.equal(await page.locator(".rt-req").count(), 4, "by-request view preserves all original requests");
   });
+}
+
+for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {
+  for (const lang of ["en", "zh"]) {
+    test(`${engine} ${lang}: request grouping is the default and either choice survives a reload`, async (t) => {
+      const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
+      const page = await browser.newPage();
+      page.setDefaultTimeout(5000);
+      const feed = {};
+      await page.route("**/*", serve(lang, feed));
+      t.after(async () => { feed.next?.([]); await browser.close(); });
+      await page.goto("http://magpie.test/?view=routing");
+      const buttons = page.locator(".rt-group-by button");
+      await page.locator(".rt-req").nth(5).waitFor();
+      assert.equal(await buttons.first().getAttribute("aria-pressed"), "true");
+      assert.equal(await page.locator(".rt-session").count(), 0);
+      await buttons.nth(1).click();
+      await page.locator(".rt-session").nth(3).waitFor();
+      feed.next?.([]);
+      await page.reload();
+      await page.locator(".rt-session").nth(3).waitFor();
+      assert.equal(await buttons.nth(1).getAttribute("aria-pressed"), "true");
+      await buttons.first().click();
+      feed.next?.([]);
+      await page.reload();
+      await page.locator(".rt-req").nth(5).waitFor();
+      assert.equal(await buttons.first().getAttribute("aria-pressed"), "true");
+      assert.equal(await page.locator(".rt-session").count(), 0);
+    });
+  }
 }

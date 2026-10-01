@@ -376,14 +376,15 @@ the vendor's cache of it is worth keeping), `session`, `turn` or `off`.
 `models=` replaces the whole list, in order; a bare model id works when only
 one provider serves it.
 
-The Routing page's Requests list groups calls by the agent's session ID.
+The Routing page's Requests list defaults to the time-ordered By request view.
+Choose By session to group calls by the agent's session ID; the page remembers
+your choice across reloads.
 Codex title helpers with an explicit parent or fork source join their originating
 chat, retaining their title badge and contributing to its cost. Titles without
 ancestry and ordinary forked chats stay separate.
 Codex chat names come from its local name index and follow renames. Unknown or
 remote-only names fall back to the ID; the full ID remains in the heading tooltip.
-Expand a session to see each request, or choose By request for the time-ordered
-list. Each request and session shows its estimated cost at the effective model
+Expand a session to see each request. Each request and session shows its estimated cost at the effective model
 prices, including cache reads and writes. Session totals cover the listed
 requests only (the live trace or the selected day's retained history), and a
 `+` marks a partial estimate. Calls without a session ID are listed separately;

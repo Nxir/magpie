@@ -1,7 +1,8 @@
 # Dropdown browser regression
 
 `routing-sessions.test.cjs` checks the Routing request list in Chromium and
-WebKit, English and Chinese: sessions are separated by agent and ID across
+WebKit, English and Chinese: the list defaults to By request and remembers
+the grouping choice across reloads; sessions are separated by agent and ID across
 model changes, known and partial costs are summed, zero prices stay known,
 title helpers merge only into their explicit parent (even arriving first),
 late chat names and renames update while preserving folds and ID tooltips,

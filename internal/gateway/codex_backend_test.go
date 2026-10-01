@@ -691,3 +691,43 @@ func TestCodexModelListNotNarrowedWhileOff(t *testing.T) {
 		t.Errorf("switched on, the picks narrow again = %v (want just gpt-6-sol)", got)
 	}
 }
+
+// Body-only title metadata and ordinary Luna Reserve turns have the same kind
+// in the native Codex trace, request log and usage ledger.
+func TestCodexOwnModelKindAccounting(t *testing.T) {
+	for _, tc := range []struct{ name, metadata, reserve, kind, parent string }{
+		{"reserve", `{"thread_source":"user"}`, "1", "luna_reserve", ""},
+		{"body title", `{"thread_source":"thread_title","parent_thread_id":"main"}`, "", "thread_title", "main"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setup(t, provider.Chat, &fake{t: t})
+			chatgpt(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				io.WriteString(w, sse(`data: {"type":"response.completed","response":{"id":"r1","usage":{"input_tokens":9,"output_tokens":2}}}`))
+			})
+			body, _ := json.Marshal(map[string]any{"model": "gpt-5.5", "stream": true, "input": "hi",
+				"client_metadata": map[string]string{"x-codex-turn-metadata": tc.metadata}})
+			s := New()
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest("POST", CodexPath+"/responses", bytes.NewReader(body))
+			req.Header.Set("Authorization", "Bearer test-token")
+			req.Header.Set("session_id", "child")
+			req.Header.Set("x-openai-codex-luna-reserve", tc.reserve)
+			s.Handler().ServeHTTP(rec, req)
+			if rec.Code != 200 {
+				t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+			}
+			routes := s.Trace(t.Context(), 0, 0).Routes
+			if len(routes) != 1 || routes[0].Kind != tc.kind || routes[0].ParentSession != tc.parent {
+				t.Fatalf("trace: %+v", routes)
+			}
+			if calls := s.Recent(); len(calls) != 1 || calls[0].Kind != tc.kind {
+				t.Fatalf("request log: %+v", calls)
+			}
+			recs := usage.Load(time.Time{})
+			if len(recs) != 1 || recs[0].Kind != tc.kind {
+				t.Fatalf("usage: %+v", recs)
+			}
+		})
+	}
+}
