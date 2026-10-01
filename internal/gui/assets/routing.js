@@ -977,6 +977,8 @@
       }
       // the reply said another model answered it
       if (tr.done && tr.status < 400 && tr.swapped) items.push([swapWhy(tr), "swap", tr]);
+      // another magpie's routing group named the member it routed to
+      else if (tr.done && tr.status < 400 && tr.routed) items.push([routedWhy(tr), "aside", tr]);
     });
     if (r.done && !r.tries.length) items.push([t("Nothing was tried: {error}", { error: r.error || r.status }), "bad"]);
     const key = JSON.stringify([r.kind, items.map(([s, c, tr]) => [s, c, tr?.model, tr?.served])]);
@@ -1034,6 +1036,16 @@
   }
   const swapWhy = (tr) => t("The vendor was asked for {sent}, and its reply says {served} answered it: another model, not just {sent} under a dated name.", { sent: tr.model, served: tr.served });
   window.swapWhy = swapWhy; // the Usage page's Requests say it too
+  // a try that asked a remote magpie for one of its routing groups: the
+  // reply names the member the group routed to, which is the group
+  // picking, not a swap — shown plain, as a model that answered
+  function routedTag(tr) {
+    const k = el("span", "routed", t("served {served}", { served: tr.served }));
+    k.title = routedWhy(tr);
+    return k;
+  }
+  const routedWhy = (tr) => t("{sent} is a routing group of the remote magpie, and it routed the request to {served}: the group picking one of its models, not the vendor swapping the model.", { sent: tr.model, served: tr.served });
+  window.routedWhy = routedWhy;
   function kindWhy(r) {
     const agent = agentName(r.agent);
     if (r.kind === "luna_reserve") return t("{agent} sent this turn on Luna Reserve, which it turns to once the plan's own allowance is used up; it picks the model itself.", { agent });
@@ -1242,7 +1254,7 @@
       // all the row says, and its titles
       const title = reqTitle(r, how, tr);
       const sig = JSON.stringify([lang, said, how, title, r.time, r.agent, agentName(r.agent), ag?.icon, r.model, r.provider, r.kind, r.effort,
-        tr?.effort, tr?.picked, tr?.fixed, tr?.swapped && tr.done && tr.status < 400 ? [tr.model, tr.served] : 0, meta, routeCost(r)]);
+        tr?.effort, tr?.picked, tr?.fixed, tr?.swapped && tr.done && tr.status < 400 ? [tr.model, tr.served] : 0, tr?.routed && tr.done && tr.status < 400 ? tr.served : 0, meta, routeCost(r)]);
       ids.add(r.id);
       let x = reqRows.get(r.id);
       if (!x || x.sig !== sig) {
@@ -1292,10 +1304,12 @@
       to.append(ef);
     }
     if (tr?.swapped && tr.done && tr.status < 400) to.append(swapTag(tr, true)); // beside the model asked for
+    else if (tr?.routed && tr.done && tr.status < 400) to.append(routedTag(tr));
     const info = el("span", "meta");
     info.append(el("span", "", meta.join(" · ")), el("span", "cost", routeCost(r)));
     info.lastChild.title = r.priced ? costNote() : t("No known price or token counts for this request");
     b.append(when, asked, to, info);
+
     b.title = title;
     return b;
   }
@@ -2738,6 +2752,7 @@
       const model = tr?.model || w?.model;
       if (model) to.append(el("span", "pr-m", model));
       if (tr?.swapped && tr.done) to.append(swapTag(tr, true));
+      else if (tr?.routed && tr.done) to.append(routedTag(tr));
     }
     const meta = [];
     if (r.tries.length > 1) meta.push(t("{n} tries", { n: r.tries.length }));
