@@ -379,7 +379,12 @@ one provider serves it.
 The Routing page's Requests list groups calls by the agent's session ID.
 Codex title helpers with an explicit parent or fork source join their originating
 chat, retaining their title badge and contributing to its cost. Titles without
-ancestry and ordinary forked chats stay separate.
+ancestry can match a recognized Codex title template's exact original user
+prompt to a unique observed chat; repeated prompts in different chats stay
+separate. Only a SHA-256 digest is kept for this matching. Live collision evidence
+outlives the 60-request display, and inference stops once its bounded index fills.
+History matching sees the retained day before its display limit is applied.
+Ordinary forked chats stay separate.
 Codex chat names come from its local name index and follow renames. Unknown or
 remote-only names fall back to the ID; the full ID remains in the heading tooltip.
 Expand a session to see each request, or choose By request for the time-ordered

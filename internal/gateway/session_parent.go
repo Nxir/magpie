@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -8,6 +10,127 @@ import (
 
 func isTitleKind(kind string) bool {
 	return kind == "thread_title" || kind == "thread_title_reconsideration" || kind == "title_generation"
+}
+
+// Some desktop titles start fresh ephemeral threads without ancestry. Their
+// user message contains the exact original prompt after this template marker.
+// Retain only its digest, and match only when one observed chat has that prompt.
+// This does not use account, model or temporal proximity as identity evidence.
+func sessionPromptKey(body []byte, kind string) string {
+	var request struct {
+		Input json.RawMessage `json:"input"`
+	}
+	if json.Unmarshal(body, &request) != nil {
+		return ""
+	}
+	var items []struct {
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
+	}
+	if json.Unmarshal(request.Input, &items) != nil {
+		return ""
+	}
+	for _, item := range items {
+		if item.Role != "user" {
+			continue
+		}
+		var text string
+		if json.Unmarshal(item.Content, &text) != nil {
+			var parts []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			}
+			if json.Unmarshal(item.Content, &parts) != nil {
+				continue
+			}
+			for _, part := range parts {
+				if part.Type == "input_text" || part.Type == "text" {
+					text += part.Text
+				}
+			}
+		}
+		text = strings.TrimSpace(text)
+		if isTitleKind(kind) {
+			// Recognize the actual desktop template, not arbitrary quoted text.
+			if !strings.HasPrefix(text, "You are a helpful assistant. You will be presented with a user prompt,") {
+				continue
+			}
+			_, prompt, ok := strings.Cut(text, "\n\nUser prompt:\n")
+			if !ok {
+				continue
+			}
+			text = strings.TrimSpace(prompt)
+		} else if kind != "" || strings.HasPrefix(text, "<environment_context>") || strings.HasPrefix(text, "<user_instructions>") || strings.HasPrefix(text, "<external_codex_apps_open_page>") {
+			continue
+		}
+		if text == "" {
+			continue
+		}
+		digest := sha256.Sum256([]byte(text))
+		return hex.EncodeToString(digest[:])
+	}
+	return ""
+}
+
+// Keep collision evidence beyond the live trace's 60 requests. Once this
+// bounded index fills, decline inference until restart instead of dropping
+// an older candidate and mistaking a repeated prompt for a unique one.
+const maxTitlePromptKeys = 4096
+
+type titleParents struct {
+	sessions map[string]string // digest -> unique session; empty means ambiguous
+	full     bool
+}
+
+func (p *titleParents) observe(r Route) {
+	if p.full || r.Agent != "codex" || r.Kind != "" || r.Session == "" || r.PromptKey == "" {
+		return
+	}
+	if p.sessions == nil {
+		p.sessions = map[string]string{}
+	}
+	if previous, ok := p.sessions[r.PromptKey]; ok {
+		if previous != r.Session {
+			p.sessions[r.PromptKey] = ""
+		}
+		return
+	}
+	if len(p.sessions) >= maxTitlePromptKeys {
+		p.sessions, p.full = nil, true
+		return
+	}
+	p.sessions[r.PromptKey] = r.Session
+}
+
+func (p *titleParents) resolve(r *Route) {
+	if r.Agent != "codex" || !isTitleKind(r.Kind) || r.PromptKey == "" || (r.ParentSession != "" && !r.ParentMatched) {
+		return
+	}
+	r.ParentSession, r.ParentMatched = "", false
+	if !p.full {
+		if id := p.sessions[r.PromptKey]; id != "" && id != r.Session {
+			r.ParentSession, r.ParentMatched = id, true
+		}
+	}
+}
+
+// ResolveTitleParents uses all retained records of a day before the display
+// limit is applied. A recorded inference is also candidate evidence, so
+// absence of its original request never reassigns it to a different chat.
+func ResolveTitleParents(routes []Route) []Route {
+	out := append([]Route(nil), routes...)
+	var parents titleParents
+	for _, r := range out {
+		parents.observe(r)
+		if r.ParentMatched && r.ParentSession != "" {
+			r.Session, r.Kind = r.ParentSession, ""
+			parents.observe(r)
+		}
+	}
+	for i := range out {
+		parents.resolve(&out[i])
+	}
+	return out
 }
 
 // Codex projects turn metadata into headers, but its canonical transport is

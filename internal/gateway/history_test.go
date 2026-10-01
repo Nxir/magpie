@@ -68,3 +68,23 @@ func TestHistoryKeepsDaysAndDropsOld(t *testing.T) {
 		t.Fatalf("kept %v, want %v", left, want)
 	}
 }
+
+func TestHistoryMatchesTitlesBeforeDisplayLimit(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	now := time.Now()
+	now = time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, time.Local)
+	saveRoute(Route{ID: 1, Time: now, Agent: "codex", Session: "first", PromptKey: "digest", Done: true})
+	for i := 2; i <= historyMax+1; i++ {
+		saveRoute(Route{ID: int64(i), Time: now.Add(time.Duration(i) * time.Second), Agent: "other", Done: true})
+	}
+	saveRoute(Route{ID: historyMax + 2, Time: now.Add(time.Duration(historyMax+2) * time.Second), Agent: "codex", Session: "helper", Kind: "thread_title", PromptKey: "digest", Done: true})
+	_, routes, cut := History(now.Format(dayForm))
+	if !cut || len(routes) != historyMax || routes[len(routes)-1].ParentSession != "first" {
+		t.Fatal("display limit lost the matching candidate")
+	}
+	saveRoute(Route{ID: historyMax + 3, Time: now.Add(time.Duration(historyMax+3) * time.Second), Agent: "codex", Session: "second", PromptKey: "digest", Done: true})
+	_, routes, _ = History(now.Format(dayForm))
+	if routes[len(routes)-2].ParentSession != "" {
+		t.Fatal("display limit hid an ambiguous candidate")
+	}
+}

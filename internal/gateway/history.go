@@ -180,6 +180,7 @@ func History(day string) (days []HistoryDay, routes []Route, cut bool) {
 		}
 	}
 	sort.SliceStable(routes, func(i, j int) bool { return routes[i].Time.Before(routes[j].Time) })
+	routes = ResolveTitleParents(routes)
 	if len(routes) > historyMax {
 		routes, cut = routes[len(routes)-historyMax:], true
 	}

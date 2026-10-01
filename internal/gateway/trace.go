@@ -28,6 +28,8 @@ type Route struct {
 	Time          time.Time      `json:"time"`
 	Agent         string         `json:"agent"`
 	ParentSession string         `json:"parentSession,omitempty"` // title helper's explicit originating chat; does not affect routing
+	ParentMatched bool           `json:"parentMatched,omitempty"` // exact prompt match, revoked on ambiguity
+	PromptKey     string         `json:"promptKey,omitempty"`     // prompt digest, never the text
 	Session       string         `json:"session,omitempty"`       // the client's session id, never inferred from its model or account
 	Usage         []usage.Record `json:"usage,omitempty"`         // token tiers of billable tries; priced when read
 	Kind          string         `json:"kind,omitempty"`          // what the call is for, as Call's
@@ -230,6 +232,7 @@ type trace struct {
 	routes []*Route
 	wake   chan struct{}
 	totals Totals
+	titles titleParents
 }
 
 // Totals count the requests routed since the gateway started.
@@ -274,6 +277,14 @@ func (t *trace) begin(r Route) *Route {
 	}
 	t.changed()
 	rp.Seq = t.seq
+	t.titles.observe(r)
+	for _, current := range t.routes {
+		parent, matched := current.ParentSession, current.ParentMatched
+		t.titles.resolve(current)
+		if parent != current.ParentSession || matched != current.ParentMatched {
+			current.Seq = t.seq
+		}
+	}
 	return rp
 }
 

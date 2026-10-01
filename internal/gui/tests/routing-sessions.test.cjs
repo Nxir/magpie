@@ -153,3 +153,28 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     assert.equal(await page.locator(".rt-req").count(), 4, "by-request view preserves all original requests");
   });
 }
+
+for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {
+  test(`${engine}: late prompt association moves the title and revokes an ambiguous match`, async (t) => {
+    const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
+    const page = await browser.newPage(); page.setDefaultTimeout(5000);
+    const feed = {};
+    const title = { ...req(1,"codex","fresh-title",0.008), kind:"thread_title" };
+    const main = { ...req(2,"codex","main-beijing",0.027), sessionTitle:"查询北京天气" };
+    await page.route("**/*",serve("zh",feed,[title,main]));
+    t.after(async()=>{feed.next?.([]);await browser.close();});
+    await page.goto("http://magpie.test/?view=routing");
+    await page.locator("button.rt-session").filter({hasText:"fresh-title"}).waitFor();
+    for(let i=0;i<50&&!feed.next;i++) await page.waitForTimeout(20);
+    feed.next([{...title,seq:3,parentSession:"main-beijing",parentMatched:true,sessionTitle:"查询北京天气"}]);
+    await page.waitForFunction(()=>document.querySelectorAll(".rt-session").length===1);
+    const group=page.locator("button.rt-session");
+    assert.match(await group.textContent(),/查询北京天气.*2 个请求/);
+    assert.equal(await group.locator(".cost").textContent(),"≈$0.035");
+    assert.equal(await page.locator(".rt-req .kind").filter({hasText:"标题"}).count(),1);
+    for(let i=0;i<50&&!feed.next;i++) await page.waitForTimeout(20);
+    feed.next([{...title,seq:4,parentSession:"",parentMatched:false},{...req(3,"codex","duplicate-prompt-chat",0.01),seq:5}]);
+    await page.waitForFunction(()=>document.querySelectorAll(".rt-session").length===3);
+    assert.equal(await page.locator("button.rt-session").filter({hasText:"fresh-title"}).count(),1);
+  });
+}

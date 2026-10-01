@@ -691,3 +691,33 @@ func TestCodexModelListNotNarrowedWhileOff(t *testing.T) {
 		t.Errorf("switched on, the picks narrow again = %v (want just gpt-6-sol)", got)
 	}
 }
+
+func TestCodexFreshTitleMatchesItsOriginalPrompt(t *testing.T) {
+	setup(t, provider.Chat, &fake{t: t})
+	chatgpt(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		io.WriteString(w, sse(`data: {"type":"response.completed","response":{"id":"r1","usage":{"input_tokens":9,"output_tokens":2}}}`))
+	})
+	s := New()
+	send := func(session, kind, text string) {
+		body, _ := json.Marshal(map[string]any{"model": "gpt-5.5", "stream": true, "input": []any{map[string]any{"role": "user", "content": []any{map[string]string{"type": "input_text", "text": text}}}}})
+		req := httptest.NewRequest("POST", CodexPath+"/responses", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer chatgpt-token")
+		req.Header.Set("session_id", session)
+		req.Header.Set("User-Agent", "codex/0.1.0")
+		if kind != "" {
+			req.Header.Set("x-codex-turn-metadata", `{"thread_source":"`+kind+`"}`)
+		}
+		s.Handler().ServeHTTP(httptest.NewRecorder(), req)
+	}
+	send("hidden-title", "thread_title", "You are a helpful assistant. You will be presented with a user prompt, and your job is to provide a short title.\n\nUser prompt:\n查询北京天气")
+	seq := s.Trace(t.Context(), 0, 0).Seq
+	send("main-beijing", "", "查询北京天气\n")
+	st := s.Trace(t.Context(), seq, 0)
+	if len(st.Routes) != 2 || st.Routes[0].ParentSession != "main-beijing" || !st.Routes[0].ParentMatched {
+		t.Fatalf("actual fresh title request handling: %+v", st.Routes)
+	}
+	if st.Routes[0].Session != "hidden-title" || len(st.Routes[0].Usage) != 1 || st.Totals.Requests != 2 {
+		t.Fatal("grouping changed original identity or accounting")
+	}
+}
