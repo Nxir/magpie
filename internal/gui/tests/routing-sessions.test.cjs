@@ -185,3 +185,32 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     });
   }
 }
+
+for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {
+  for (const lang of ["en", "zh"]) {
+    test(`${engine} ${lang}: zero partial estimates keep the amount and one request uses the singular label`, async (t) => {
+      const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
+      const page = await browser.newPage();
+      page.setDefaultTimeout(5000);
+      const feed = {};
+      const fixture = [{ ...req(1, "codex", "partial", 0), unpriced: 1 },
+        req(2, "codex", "mixed", 0), req(3, "codex", "mixed", 0, false),
+        req(4, "claude", "unknown", 0, false)];
+      await page.route("**/*", serve(lang, feed, fixture));
+      t.after(async () => { feed.next?.([]); await browser.close(); });
+      await page.goto("http://magpie.test/?view=routing");
+      await page.locator(".rt-req").nth(3).waitFor();
+      assert.equal(await page.locator(".rt-req").filter({ hasText: "model-a" }).locator(".cost").textContent(), "≈$0.000+", "a zero-priced attempt plus an unknown attempt retains its amount");
+      await page.locator(".rt-group-by button").nth(1).click();
+      const group = (name) => page.locator("button.rt-session").filter({ hasText: name });
+      assert.equal(await group("Codex · partial").locator(".cost").textContent(), "≈$0.000+");
+      assert.match(await group("Codex · partial").locator(".summary").textContent(), lang === "zh" ? /^1 个请求/ : /^1 request ·/);
+      assert.equal(await group("Codex · mixed").locator(".cost").textContent(), "≈$0.000+", "a free request plus an unknown request is a partial zero estimate");
+      assert.match(await group("Codex · mixed").locator(".summary").textContent(), lang === "zh" ? /^2 个请求/ : /^2 requests ·/);
+      assert.equal(await group("Claude Code · unknown").locator(".cost").textContent(), "—", "all unknown stays unknown");
+      await page.evaluate(() => { currency = "cny"; fx = { rate: 7, at: null, stale: false }; renderCosts(); });
+      assert.equal(await group("Codex · mixed").locator(".cost").textContent(), "≈¥0.000+");
+      assert.equal(await page.locator(".rt-req").filter({ hasText: "model-a" }).locator(".cost").textContent(), "≈¥0.000+");
+    });
+  }
+}

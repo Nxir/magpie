@@ -105,10 +105,27 @@ function sent(input, init) {
   return p ? bunFetch(input, { ...init, proxy: p }) : bunFetch(input, init)
 }
 
+// listing is what a models hook's fetches came to: whether it asked any,
+// and whether the last it asked answered
+const listing = new AsyncLocalStorage()
+
+function asked(input, init) {
+  const l = listing.getStore()
+  if (!l) return sent(input, init)
+  l.tried = true
+  return sent(input, init).then(
+    (res) => ((l.lastOk = res.ok), res),
+    (e) => {
+      l.lastOk = false
+      throw e
+    },
+  )
+}
+
 globalThis.fetch = Object.assign(function fetch(input, init) {
   const r = reach.getStore()
-  if (!r) return sent(input, init)
-  return sent(input, init).then(
+  if (!r) return asked(input, init)
+  return asked(input, init).then(
     (res) => ((r.reached = true), res),
     (e) => {
       r.failed ??= e
@@ -533,7 +550,15 @@ async function info(id, key, strict) {
     const all = readAuth()
     const k = key ?? accountsOf(all, id)[0] ?? id
     try {
-      const next = await inScope(id, k, () => ph.models(JSON.parse(JSON.stringify(out)), { auth: all[k] }))
+      const given = JSON.parse(JSON.stringify(out))
+      const l = { tried: false, lastOk: false }
+      const next = await listing.run(l, () => inScope(id, k, () => ph.models(given, { auth: all[k] })))
+      // a hook that asked its vendor, got no list and gave back the one it
+      // was given fell back: magpie keeps the list it had, as a built-in
+      // whose fetch failed keeps the one it fetched last; so does one that
+      // says so, handing back a list of its own (Symbol.for("magpie.fellBack")
+      // on it: Command Code's Go table, ZCode's models)
+      out.fellBack = (next === given.models && l.tried && !l.lastOk) || next?.[Symbol.for("magpie.fellBack")] === true
       out.models = Object.fromEntries(Object.entries(next ?? {}).map(([k, m]) => [k, { ...m, id: k, providerID: id }]))
     } catch (e) {
       // an error the models hook throws may say what it means for the
@@ -546,6 +571,9 @@ async function info(id, key, strict) {
       if (strict && !(e?.signIn === "expired" && all[k])) throw e
       const r = reach.getStore()
       if (r && e?.signIn === "expired") r.refused ??= e?.message ?? String(e)
+      // a hook that threw on its vendor's failure has no list to tell:
+      // magpie keeps the one it had, as for one that gave its defaults back
+      out.fellBack = true
       send({ event: "log", level: "error", message: `${h.spec}: provider.models: ${e?.message ?? e}` })
     }
   }
@@ -592,8 +620,9 @@ async function providers() {
     const p = await info(id)
     // each account's own models, as the built-ins read each account's: a
     // plan may serve fewer, or others, than the first account's. One that
-    // can't be read is taken to have them all.
-    const own = await Promise.all(keys.slice(1).map((k) => info(id, k, true).catch(() => null)))
+    // can't be read is taken to have them all, or the ones it was last
+    // told to have, as a built-in account whose fetch failed keeps its own.
+    const own = await Promise.all(keys.slice(1).map((k) => info(id, k, true).catch(() => ({ failed: true }))))
     const models = { ...p.models }
     for (const q of own) for (const [k, m] of Object.entries(q?.models ?? {})) models[k] ??= m
     const ids = (q) => Object.values(q.models).filter((m) => m.status !== "deprecated").map((m) => m.id)
@@ -610,12 +639,14 @@ async function providers() {
       signedIn: keys.length > 0,
       authType: first?.type ?? "",
       accountId: whoOf(first),
+      fellBack: keys.length > 0 && !!p.fellBack,
       accounts: keys.map((k, i) => ({
         key: k,
         type: stored[k]?.type ?? "",
         accountId: whoOf(stored[k]),
         hint: hintOf(stored[k]),
-        models: own.length === 0 ? undefined : i === 0 ? ids(p) : own[i - 1] ? ids(own[i - 1]) : undefined,
+        models: own.length === 0 ? undefined : i === 0 ? ids(p) : own[i - 1]?.models ? ids(own[i - 1]) : undefined,
+        fellBack: i === 0 ? !!p.fellBack : !!(own[i - 1]?.fellBack || own[i - 1]?.failed),
       })),
       models: Object.values(models)
         .filter((m) => m.status !== "deprecated")

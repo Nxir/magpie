@@ -26,6 +26,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/yetone/magpie/internal/netproxy"
+	"github.com/yetone/magpie/internal/plugin"
 	"github.com/yetone/magpie/internal/provider"
 	"github.com/yetone/magpie/internal/redact"
 	"github.com/yetone/magpie/internal/settings"
@@ -306,6 +307,8 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	go provider.KeepWorkBuddyCheckedIn(ctx)
 	// and moves the built-in subscriptions being retired onto their plugins
 	go provider.KeepRetiringMoved(ctx)
+	// and keeps the community's plugins up to date, noting others' updates
+	go plugin.KeepUpdated(ctx)
 	for _, f := range WhileServing {
 		go f(ctx)
 	}
@@ -410,7 +413,7 @@ func modelObject(e provider.Entry) map[string]any {
 		levels = append(levels, reasoningLevel{Effort: effort})
 	}
 	m := map[string]any{"id": e.ID, "object": "model", "type": "model", "created": 0, "created_at": "2025-01-01T00:00:00Z",
-		"owned_by": e.Provider.ID, "display_name": e.Name, "reasoning": len(levels) > 0, "supported_reasoning_levels": levels}
+		"owned_by": e.Provider.ID, "display_name": e.Name, "reasoning": e.Reasoning || len(levels) > 0, "supported_reasoning_levels": levels}
 	// the window, as the names clients read it by: a group's context
 	// (magpie group set … context=) included
 	if e.Context > 0 {
@@ -545,7 +548,7 @@ func unprefixed(id string) string {
 // estimatedMoved are the built-ins that estimated a count, as their
 // plugins do once moved; Command Code's whatever its plan, as the plugin
 // alone knows a Go key.
-var estimatedMoved = []string{"cursor", "grok", "devin", "kiro", "qoder", "zed", "factory", provider.CommandCodePlanID}
+var estimatedMoved = []string{"cursor", "grok", "devin", "kiro", "qoder", "zed", "factory", "zcode", provider.CommandCodePlanID}
 
 // countTokens answers Anthropic's count_tokens: through the provider when
 // it implements counting, else a rough estimate. A failed connection or
@@ -566,9 +569,17 @@ func (s *Server) countTokens(w http.ResponseWriter, r *http.Request) {
 	w, body, unmask := redacted(w, body)
 	defer unmask()
 	p, model, ok := provider.Resolve(unprefixed(model))
+	s.countOn(w, r, p, model, ok, body)
+}
+
+// countOn counts body's tokens for model on p, resolved when ok.
+func (s *Server) countOn(w http.ResponseWriter, r *http.Request, p provider.Provider, model string, ok bool, body []byte) {
 	// Claude Subscription generations run through the Claude Code binary. Its
 	// OAuth token must not take a direct HTTP side path just for token counting.
-	if ok && p.Account != nil && (p.Account.Agent == "claude" || p.Account.Agent == "cursor" || p.Account.Agent == "grok" || p.Account.Agent == "devin" || p.Account.Agent == "kiro" || p.Account.Agent == "qoder" || p.Account.Agent == provider.QoderCNID || p.Account.Agent == "zed" || p.Account.Agent == "factory" || p.Account.Agent == "gemini" || p.Account.Agent == "antigravity") ||
+	if ok && p.Account != nil && (p.Account.Agent == "claude" || p.Account.Agent == "cursor" || p.Account.Agent == "grok" || p.Account.Agent == "devin" || p.Account.Agent == "kiro" || p.Account.Agent == "qoder" || p.Account.Agent == provider.QoderCNID || p.Account.Agent == "zed" || p.Account.Agent == "factory" || p.Account.Agent == "gemini" || p.Account.Agent == "antigravity" ||
+		// ZCode itself never counts, and zcode.z.ai answers count_tokens
+		// with an error every time: one more request its firewall weighs
+		p.Account.Agent == "zcode") ||
 		ok && p.Account != nil && p.Account.Agent == provider.CommandCodePlanID && cmdGoing(r.Context(), p) ||
 		ok && p.IsPlugin() && slices.Contains(estimatedMoved, p.ID) {
 		req, err := parseAnthropic(body)
@@ -1041,6 +1052,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 		// the last one's failure is held too when an earlier one failed,
 		// for its allowance running out to be told as that one's error
 		hw := newHoldWriter(w, !last || again < lastRetries || other != nil)
+		hw.thinkingShown = !refusesAfterThinking(c.model)
 		call.Provider, call.To, call.Usage = c.p.ID, "", Usage{}
 		where = c.p.Where()
 		providerKeyID, providerKeyName = "", ""
@@ -1184,7 +1196,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			skipped = append(skipped, c.label()+": "+call.Error)
 			matesFirst(cands[i+1:], c)
 			if call.To != "" {
-				usage.Append(usage.Record{Time: began, Agent: call.Agent, Via: call.Via, Provider: call.Provider, Host: where, Model: c.model,
+				usage.Append(usage.Record{RouteID: tr.ID, Time: began, Agent: call.Agent, Via: call.Via, Provider: call.Provider, Host: where, Model: c.model,
 					ProviderKeyID: providerKeyID, ProviderKeyName: providerKeyName,
 					Requested: call.Model, Served: call.Usage.Served,
 					Input: call.Usage.Input, Output: call.Usage.Output, CacheRead: call.Usage.CacheRead,
@@ -1339,7 +1351,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 	})
 	s.record(call)
 	if call.To != "" {
-		usage.Append(usage.Record{Time: start, Agent: call.Agent, Via: call.Via, Provider: call.Provider, Host: where, Model: model,
+		usage.Append(usage.Record{RouteID: tr.ID, Time: start, Agent: call.Agent, Via: call.Via, Provider: call.Provider, Host: where, Model: model,
 			ProviderKeyID: providerKeyID, ProviderKeyName: providerKeyName,
 			Requested: call.Model, Served: call.Usage.Served,
 			Input: call.Usage.Input, Output: call.Usage.Output, CacheRead: call.Usage.CacheRead,
@@ -1684,6 +1696,12 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 	if proto != provider.Anthropic {
 		body = s.withoutRefused(p.ID, proto, body)
 	}
+	// a Grok subscription is given Codex's namespaced functions flat
+	// (grokBody); a call to one goes back under its namespace (#404)
+	var named map[string]nsTool
+	if proto == provider.Responses && p.Account != nil && p.Account.Agent == "grok" {
+		named = namespacedIn(body)
+	}
 	res, err := s.forward(r.Context(), p, proto, path, p.Prepare(body), r.Header)
 	if err != nil {
 		return writeError(w, proto, 502, p.Name+": "+err.Error()), err.Error(), true
@@ -1792,6 +1810,10 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 	if searchFn && sse {
 		search = &searchTidy{}
 	}
+	var spaces *nsTidy
+	if named != nil {
+		spaces = &nsTidy{named: named, sse: sse}
+	}
 	buf := make([]byte, 32<<10)
 	var rerr error
 	for {
@@ -1804,6 +1826,9 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 			}
 			if search != nil {
 				out = search.write(out)
+			}
+			if spaces != nil {
+				out = spaces.write(out)
 			}
 			if _, werr := w.Write(out); werr != nil {
 				return res.StatusCode, "", true
@@ -1821,7 +1846,14 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 		w.Write(tidy.flush())
 	}
 	if search != nil {
-		w.Write(search.flush())
+		out := search.flush()
+		if spaces != nil {
+			out = spaces.write(out)
+		}
+		w.Write(out)
+	}
+	if spaces != nil {
+		w.Write(spaces.flush())
 	}
 	if sse && r.Context().Err() == nil && !sniff.whole() {
 		// the upstream died mid-reply, or ended it short of its last
@@ -1960,7 +1992,7 @@ func (s *Server) forwardTranslated(ctx context.Context, p provider.Provider, to 
 		}
 		if offEffort(req.Effort) && !s.fits(p.ID, offRefused(model), to) {
 			r := *req
-			r.Effort, req = fitFor(p, model, "low"), &r
+			r.Effort, req = onEffort(p, model), &r
 		}
 		if to == provider.Anthropic && p.IsBedrock() && req.Metadata != nil {
 			// not the plain id Bedrock checks metadata.user_id against (#176)
@@ -2012,7 +2044,7 @@ func (s *Server) forwardTranslated(ctx context.Context, p provider.Provider, to 
 			// at its lowest, and so from then on
 			s.markUnfit(p.ID, offRefused(model), to)
 			r := *req
-			r.Effort, req = fitFor(p, model, "low"), &r
+			r.Effort, req = onEffort(p, model), &r
 			continue
 		}
 		if to == provider.Chat && res.StatusCode == http.StatusBadRequest && req.Effort != "none" &&
@@ -2575,6 +2607,14 @@ func conversationID(in http.Header, body []byte) string {
 
 // offEffort is an effort turning reasoning off, or as near off as asked.
 func offEffort(e string) bool { return e == "none" || e == "minimal" }
+
+// onEffort is the lowest level offered with reasoning on, or low when none
+// are known. A catalog's minimal must not be picked again after off was
+// refused; the catalog itself stays as it was.
+func onEffort(p provider.Provider, model string) string {
+	levels := slices.DeleteFunc(slices.Clone(p.Efforts(model)), offEffort)
+	return fitEffort("low", levels)
+}
 
 // offRefused is how unfit remembers a provider refusing reasoning turned
 // off for model.

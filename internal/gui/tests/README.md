@@ -3,7 +3,8 @@
 `routing-sessions.test.cjs` checks the Routing request list in Chromium and
 WebKit, English and Chinese: the list defaults to By request and remembers
 the grouping choice across reloads; sessions are separated by agent and ID across
-model changes, known and partial costs are summed, zero prices stay known,
+model changes, known and partial costs are summed, zero partial estimates
+retain their amount and +, single-request headings use the singular, zero prices stay known,
 title helpers merge only into their explicit parent (even arriving first),
 late chat names and renames update while preserving folds and ID tooltips,
 missing IDs and old unpriced requests remain visible, folded sessions stay
@@ -40,11 +41,22 @@ sign-in with pasteCallback shows) in a narrow Chinese
 dark window: invalid input remains editable, retry reaches the callback route,
 and a pending or accepted submission cannot be submitted twice.
 
+`plugin-updates.test.cjs` checks the dot on Plugins while a plugin's update
+waits for the reader, gone once it's updated, and the "Auto-updated" chip on a
+plugin magpie updated by itself.
+
 `plugin-signin.test.cjs` checks a provider an OpenCode plugin signs in to:
 the add sheet lists it under "From plugins"; its sign-in asks the way, the
 method's questions (a pick, then a text the plugin checks), then takes the
 code the browser page shows; an API-key way opens the account. English and
 Chinese, Chromium and WebKit, with the API faked.
+
+`plugin-move-overflow.test.cjs` checks a Plugins card that offers a
+built-in's accounts ("Move my 1 Grok (SuperGrok) account"): the button has a
+row of its own at the card's foot, so it stays inside the card and the
+plugin's name and "magpie community" aren't cut, in a three-, two- and
+one-column window. English and Chinese, Chromium and WebKit, with the API
+faked.
 
 `plugin-key-hint.test.cjs` checks a plugin's API-key way: its label titles
 the key's field and its placeholder is the field's hint, while a way labelled
@@ -371,6 +383,12 @@ filters shown with no page and says where the file went. At the window's
 narrowest (560) the table scrolls in its box and no tab scrolls the page
 sideways; no left-border stripe; in English and Chinese, light and dark.
 
+`usage-ledger.test.cjs` also follows a request from Usage to its routing
+story and back to every usage row sharing that route ID. It checks archived
+routes with no live gateway, cleared history, rows recorded before IDs were
+kept, clearing the route filter and exporting it, in Chromium and WebKit,
+English and Chinese.
+
 `sessions-overview.test.cjs` checks the Usage page's Sessions overview: six
 figures (sessions with their median and p90, tokens, cost, cache read, active
 time, projects with the top one's share), the range as bars up to 100 days
@@ -444,6 +462,13 @@ unapproved channel" (Codex's system prompt, #182) on the Routing page: the
 vendor's words are given without the hint the gateway adds, and the hint is
 on its own line in English and Chinese; another 400 gets none, and picking
 the request leaves the page where it is. Chromium and WebKit, API faked.
+
+`routing-blocked.test.cjs` opens a request a vendor's edge firewall blocked
+(Alibaba Cloud's 405 page in front of zcode.z.ai) on the Routing page: what
+the gateway made of it is given without the hint it adds, and the hint (the
+firewall blocked this IP; wait, or switch network or proxy) is on its own
+line in English and Chinese; another 405 gets none, and picking the request
+leaves the page where it is. Chromium and WebKit, API faked.
 
 `routing-shape.test.cjs` opens a group request whose first member answered
 422 because its API couldn't read the request (#350: SuperGrok and Codex's
@@ -650,10 +675,31 @@ container's own and to set `MAGPIE_PUBLIC_URL`. Outside a container nothing
 changes. No coloured left border; English and Chinese, Chromium and WebKit,
 with `/api/plugins` faked.
 
+`routing-time.test.cjs` checks a routing group's rule for hours of the day
+(Discord: send a provider's peak-price hours, DeepSeek's or GLM's, to
+another). The group's rule and the trace read it as its hours and days
+(22:00–08:00 Mon–Fri; 周一–周五 22:00–08:00); in the editor the hours are two
+times typed into one pill, a click on it types the first and moves nothing,
+past midnight is noted, a time that isn't one is marked once left, the days
+are picked like the agents (weekdays, then Saturday too: Mon–Sat), and the
+rule is saved as `time: {from, to, days}`. English and Chinese, Chromium and
+WebKit, with `/api/plugins` faked.
+
+`unlisted-models.test.cjs` checks a provider set to "Only through routing
+groups" (只通过路由分组使用; 悠悠哥 on Discord: hy4 vanished from the pickers).
+The model picker's filter, finding such a model, says why it isn't offered:
+hy3, in the group Mine, is reached by picking Mine ("Pick Mine" sets it);
+hy4, in no group, can't be used, and "Make a routing group of it" opens the
+Routing page on a new group of it, added with `members: ["hunyuan/hy4"]`.
+The provider's editor names its models in no group under the tick (not once
+unticked), each a click from a group; `?view=routing&newgroup=` opens the
+window on one, and the tray panel asks `window/main` for it. The page doesn't
+move, no left-border accent; English and Chinese, Chromium and WebKit.
+
 With Node.js and Playwright available:
 
 ```sh
-node --test internal/gui/tests/menu-scroll.test.cjs internal/gui/tests/click-scroll.test.cjs internal/gui/tests/panel-fold.test.cjs internal/gui/tests/rollup-short.test.cjs internal/gui/tests/panel-routing.test.cjs internal/gui/tests/gateway-fold.test.cjs internal/gui/tests/routing-kind.test.cjs internal/gui/tests/balance-fix.test.cjs internal/gui/tests/cli-update.test.cjs internal/gui/tests/login-import.test.cjs internal/gui/tests/agy-launch.test.cjs internal/gui/tests/currency.test.cjs internal/gui/tests/usage-ledger.test.cjs internal/gui/tests/update-check.test.cjs internal/gui/tests/omarchy.test.cjs internal/gui/tests/brand.test.cjs internal/gui/tests/library-loading.test.cjs node --test internal/gui/tests/signin-callback.test.cjs internal/gui/tests/routing-steady.test.cjs internal/gui/tests/old-webkit.test.cjs internal/gui/tests/session-terminal.test.cjs internal/gui/tests/text-size.test.cjs internal/gui/tests/zcode-site.test.cjs internal/gui/tests/rail-tip.test.cjs internal/gui/tests/sync-update.test.cjs internal/gui/tests/plugin-signin.test.cjs internal/gui/tests/plugin-market.test.cjs internal/gui/tests/s3-sync.test.cjs internal/gui/tests/routing-wb-refused.test.cjs internal/gui/tests/routing-shape.test.cjs internal/gui/tests/market-have.test.cjs internal/gui/tests/sessions-today.test.cjs internal/gui/tests/routing-side-calls.test.cjs internal/gui/tests/import-all-skills.test.cjs internal/gui/tests/routing-flood.test.cjs internal/gui/tests/routing-busy.test.cjs internal/gui/tests/own-skill.test.cjs internal/gui/tests/routing-manual.test.cjs internal/gui/tests/tray-usages.test.cjs internal/gui/tests/provider-remove.test.cjs internal/gui/tests/signin-link.test.cjs internal/gui/tests/tray-inuse.test.cjs internal/gui/tests/codex-auto-reset.test.cjs internal/gui/tests/routing-auto-reset.test.cjs internal/gui/tests/claude-usage-asked.test.cjs internal/gui/tests/claude-risk.test.cjs internal/gui/tests/library-toggle-status.test.cjs internal/gui/tests/library-all.test.cjs internal/gui/tests/routing-reroute-title.test.cjs internal/gui/tests/plain-names.test.cjs internal/gui/tests/panel-effort.test.cjs internal/gui/tests/agent-models-all-hidden.test.cjs internal/gui/tests/omp-roles.test.cjs internal/gui/tests/claude-effort.test.cjs internal/gui/tests/remote-magpie.test.cjs internal/gui/tests/qoder-cn-tile.test.cjs internal/gui/tests/provider-levels-scroll.test.cjs internal/gui/tests/signin-paste-codex.test.cjs internal/gui/tests/usage-alert.test.cjs internal/gui/tests/quota-families.test.cjs internal/gui/tests/provider-search.test.cjs internal/gui/tests/webdav-settings-refresh.test.cjs internal/gui/tests/lan-docker.test.cjs internal/gui/tests/plugin-key-hint.test.cjs internal/gui/tests/update-hide.test.cjs internal/gui/tests/tray-logos.test.cjs internal/gui/tests/routing-proxy.test.cjs internal/gui/tests/sse-body.test.cjs internal/gui/tests/remote-group-served.test.cjs
+node --test internal/gui/tests/menu-scroll.test.cjs internal/gui/tests/click-scroll.test.cjs internal/gui/tests/panel-fold.test.cjs internal/gui/tests/rollup-short.test.cjs internal/gui/tests/panel-routing.test.cjs internal/gui/tests/gateway-fold.test.cjs internal/gui/tests/routing-kind.test.cjs internal/gui/tests/balance-fix.test.cjs internal/gui/tests/cli-update.test.cjs internal/gui/tests/login-import.test.cjs internal/gui/tests/agy-launch.test.cjs internal/gui/tests/currency.test.cjs internal/gui/tests/usage-ledger.test.cjs internal/gui/tests/update-check.test.cjs internal/gui/tests/omarchy.test.cjs internal/gui/tests/brand.test.cjs internal/gui/tests/library-loading.test.cjs node --test internal/gui/tests/signin-callback.test.cjs internal/gui/tests/routing-steady.test.cjs internal/gui/tests/old-webkit.test.cjs internal/gui/tests/session-terminal.test.cjs internal/gui/tests/text-size.test.cjs internal/gui/tests/zcode-site.test.cjs internal/gui/tests/rail-tip.test.cjs internal/gui/tests/sync-update.test.cjs internal/gui/tests/plugin-signin.test.cjs internal/gui/tests/plugin-market.test.cjs internal/gui/tests/s3-sync.test.cjs internal/gui/tests/routing-wb-refused.test.cjs internal/gui/tests/routing-blocked.test.cjs internal/gui/tests/routing-shape.test.cjs internal/gui/tests/market-have.test.cjs internal/gui/tests/sessions-today.test.cjs internal/gui/tests/routing-side-calls.test.cjs internal/gui/tests/import-all-skills.test.cjs internal/gui/tests/routing-flood.test.cjs internal/gui/tests/routing-busy.test.cjs internal/gui/tests/own-skill.test.cjs internal/gui/tests/routing-manual.test.cjs internal/gui/tests/tray-usages.test.cjs internal/gui/tests/provider-remove.test.cjs internal/gui/tests/signin-link.test.cjs internal/gui/tests/tray-inuse.test.cjs internal/gui/tests/codex-auto-reset.test.cjs internal/gui/tests/routing-auto-reset.test.cjs internal/gui/tests/claude-usage-asked.test.cjs internal/gui/tests/claude-risk.test.cjs internal/gui/tests/library-toggle-status.test.cjs internal/gui/tests/library-all.test.cjs internal/gui/tests/routing-reroute-title.test.cjs internal/gui/tests/plain-names.test.cjs internal/gui/tests/panel-effort.test.cjs internal/gui/tests/agent-models-all-hidden.test.cjs internal/gui/tests/omp-roles.test.cjs internal/gui/tests/claude-effort.test.cjs internal/gui/tests/remote-magpie.test.cjs internal/gui/tests/qoder-cn-tile.test.cjs internal/gui/tests/provider-levels-scroll.test.cjs internal/gui/tests/signin-paste-codex.test.cjs internal/gui/tests/usage-alert.test.cjs internal/gui/tests/quota-families.test.cjs internal/gui/tests/provider-search.test.cjs internal/gui/tests/webdav-settings-refresh.test.cjs internal/gui/tests/lan-docker.test.cjs internal/gui/tests/plugin-key-hint.test.cjs internal/gui/tests/update-hide.test.cjs internal/gui/tests/tray-logos.test.cjs internal/gui/tests/routing-proxy.test.cjs internal/gui/tests/sse-body.test.cjs internal/gui/tests/remote-group-served.test.cjs internal/gui/tests/plugin-move-overflow.test.cjs internal/gui/tests/routing-time.test.cjs internal/gui/tests/unlisted-models.test.cjs internal/gui/tests/plugin-updates.test.cjs
 ```
 
 If Playwright is installed outside the repository, set `NODE_PATH` to the

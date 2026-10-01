@@ -76,7 +76,8 @@ func periodOf(s string) usage.Period {
 }
 
 func ledgerFilter(q url.Values) usage.Filter {
-	return usage.Filter{Agent: q.Get("agent"), Failed: q.Get("failed") == "1", Query: q.Get("q")}
+	id, _ := strconv.ParseInt(q.Get("route"), 10, 64)
+	return usage.Filter{RouteID: id, Agent: q.Get("agent"), Failed: q.Get("failed") == "1", Query: q.Get("q")}
 }
 
 // ledgerRow is a usage.Row with the names the page shows it by.
@@ -198,8 +199,8 @@ func usageRoutes(mux *http.ServeMux, w Windows) {
 	// keys' balances come from the
 	// vendors, which can be slow or unreachable, so the page asks for them
 	// apart from the local log.
-	// ?asked=1 is the user opening or refreshing the page, the one time
-	// Claude Code's own /usage is run (provider.AskClaudeUsage).
+	// ?asked=1 is the user opening or refreshing the page: Claude Code's
+	// own /usage is run at once (provider.AskClaudeUsage).
 	mux.HandleFunc("GET /api/usage/quotas", func(rw http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("asked") != "" {
 			provider.AskClaudeUsage()

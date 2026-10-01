@@ -3,6 +3,10 @@ package gui
 import (
 	"encoding/json"
 	"math"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/yetone/magpie/internal/gateway"
@@ -58,5 +62,34 @@ func TestRoutingEffectiveCosts(t *testing.T) {
 	}
 	if decoded.Seq != 1 || len(decoded.Routes) != 3 || !decoded.Routes[0].Priced || decoded.Routes[0].Session != "conversation" || decoded.Routes[0].ParentSession != "parent-conversation" {
 		t.Fatalf("API response %s", b)
+	}
+}
+
+// A route opened from the ledger gets the same pricing as the request list.
+func TestRouteLookupPricing(t *testing.T) {
+	sandboxHome(t)
+	old := served.Swap(nil)
+	t.Cleanup(func() { served.Store(old) })
+	if err := settings.Save(settings.Settings{ModelPrices: map[string]settings.ModelPrice{
+		"free/m": {Input: new(float64(0)), Output: new(float64(0)), CacheRead: new(float64(0)), CacheWrite: new(float64(0))},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(gateway.HistoryDir(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gateway.HistoryDir(), "2026-10-01.jsonl"), []byte(`{"id":123,"model":"m","done":true,"usage":[{"provider":"free","model":"m","in":100,"out":10},{"provider":"unknown","model":"m","in":100,"out":10}]}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	traceRoutes(mux)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest("GET", "/api/gateway/route?id=123&day=2026-10-01", nil))
+	var row routeJSON
+	if err := json.Unmarshal(w.Body.Bytes(), &row); err != nil {
+		t.Fatal(err)
+	}
+	if w.Code != http.StatusOK || row.ID != 123 || !row.Priced || row.Cost != 0 || row.Unpriced != 1 {
+		t.Fatalf("lookup price: %+v; status %d", row, w.Code)
 	}
 }

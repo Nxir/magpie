@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -24,7 +25,7 @@ func requestSessionMetadata(h http.Header, body []byte) sessionMetadata {
 		Metadata map[string]json.RawMessage `json:"client_metadata"`
 	}
 	var m sessionMetadata
-	if json.Unmarshal(body, &envelope) == nil {
+	if bytes.Contains(body, []byte("client_metadata")) && json.Unmarshal(body, &envelope) == nil {
 		if raw := envelope.Metadata["x-codex-turn-metadata"]; len(raw) > 0 {
 			var text string
 			if json.Unmarshal(raw, &text) == nil {
