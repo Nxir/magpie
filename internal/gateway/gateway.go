@@ -210,6 +210,10 @@ type Call struct {
 	ResponseBody      string `json:"responseBody,omitempty"`
 	RequestTruncated  bool   `json:"requestTruncated,omitempty"`
 	ResponseTruncated bool   `json:"responseTruncated,omitempty"`
+	// Archive: "<date>/<id>", where the request archive keeps the call,
+	// when it was on (archive.go); wire what it keeps besides
+	Archive string `json:"archive,omitempty"`
+	wire    *wire
 }
 
 // Server is the gateway.
@@ -264,6 +268,11 @@ func (s *Server) Recent() []Call {
 }
 
 func (s *Server) record(c Call) {
+	if c.wire != nil {
+		c.Archive = c.wire.name
+		archive(c)
+		c.wire = nil
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.recent = append(s.recent, c)
@@ -356,6 +365,7 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, 200, map[string]any{"name": "magpie", "version": Version})
 	})
 	mux.HandleFunc("GET /v1/magpie/quotas", s.quotas)
+	mux.HandleFunc("GET /v1/magpie/route", s.sessionRoute)
 	mux.HandleFunc("POST /v1/chat/completions", s.handle(provider.Chat))
 	mux.HandleFunc("POST /chat/completions", s.handle(provider.Chat))
 	mux.HandleFunc("POST /v1/responses", s.handle(provider.Responses))
@@ -386,7 +396,7 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"name": "magpie", "version": Version, "models": len(provider.Catalog()), "window": Window,
-		"apis": []string{"/v1/chat/completions", "/v1/responses", "/v1/messages", "/v1/systemone", "/v1beta/models/{model}:generateContent", "/v1/images/generations", "/v1/images/edits", "/v1/videos", "/v1/magpie/quotas"}})
+		"apis": []string{"/v1/chat/completions", "/v1/responses", "/v1/messages", "/v1/systemone", "/v1beta/models/{model}:generateContent", "/v1/images/generations", "/v1/images/edits", "/v1/videos", "/v1/magpie/quotas", "/v1/magpie/route"}})
 }
 
 // quotas is what is left of every subscription, plan and key magpie has,
@@ -789,7 +799,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 	who, agent := callerOf(r), agentOf(r)
 	metadata := requestSessionMetadata(r.Header, body)
 	call := Call{Time: start, From: from, Model: unprefixed(modelOf(body)), Agent: who.agent, Via: who.via, Kind: requestCallKind(r.Header, metadata),
-		RequestBody: requestBody, RequestTruncated: requestTruncated}
+		RequestBody: requestBody, RequestTruncated: requestTruncated, wire: archiving(r, capture, start)}
 	if call.Kind == "web_search" {
 		call.For = searchFor(r.Context())
 	}
@@ -1105,10 +1115,16 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 				attemptBody, picked = b, true
 			}
 		}
+		// a member sent fast is, in its vendor's words, where its model
+		// has a fast mode; else it goes as the agent asked
+		fast := c.fast && provider.CanFast(c.p, c.model)
+		if fast {
+			attemptBody = withFast(from, attemptBody)
+		}
 		// the reasoning the model is asked for, whoever chose it
 		sent = sentEffort(from, attemptBody, c.p, c.model)
 		s.trace.update(tr, func(t *Route) {
-			t.Tries = append(t.Tries, Try{ID: c.rest, Model: c.model, Effort: sent, Picked: picked, Fixed: c.effort, Start: began})
+			t.Tries = append(t.Tries, Try{ID: c.rest, Model: c.model, Effort: sent, Picked: picked, Fixed: c.effort, Fast: fast, Start: began})
 		})
 		held := false // answered as its vendor did a moment ago, without asking
 		if said, ok := verifyHeld(c.restKey()); ok && last {
@@ -1128,7 +1144,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			// the vendor's safety filter, with nothing said (#248)
 			call.Error = refusedError(c.p, c.model, hw.failMsg)
 		}
-		try := Try{ID: c.rest, Model: c.model, Effort: sent, Picked: picked, Fixed: c.effort, Start: began, Done: true, Status: call.Status, Millis: time.Since(began).Milliseconds(), Error: call.Error,
+		try := Try{ID: c.rest, Model: c.model, Effort: sent, Picked: picked, Fixed: c.effort, Fast: fast, Start: began, Done: true, Status: call.Status, Millis: time.Since(began).Milliseconds(), Error: call.Error,
 			Served: call.Usage.Served}
 		asName := provider.SentNameOnIn(wiresOf(r.Context()), c.p.ID, accountAgent(c.p), c.model, sent)
 		try.Swapped, try.Routed = swapped(asName, call.Usage.Served), usage.GroupRouted(asName, call.Usage.Served)
@@ -1534,7 +1550,11 @@ func (s *Server) forwardOnce(ctx context.Context, p provider.Provider, to provid
 				}
 			}
 		}
-		if bs := s.betas(p, in.Values("anthropic-beta")); len(bs) > 0 {
+		asked := in.Values("anthropic-beta")
+		if gjson.GetBytes(body, "speed").String() == "fast" && provider.HostOf(p.Base(to)) == "api.anthropic.com" {
+			asked = append(slices.Clone(asked), claudeFastBeta) // a group's member sent fast
+		}
+		if bs := s.betas(p, asked); len(bs) > 0 {
 			req.Header.Set("anthropic-beta", strings.Join(bs, ","))
 		} else {
 			req.Header.Del("anthropic-beta")
@@ -2365,7 +2385,13 @@ func build(proto provider.Protocol, r *Request, model, host string, rejectTemp b
 	case provider.Responses:
 		return buildResponses(r, model, host, rejectTemp)
 	}
-	return buildAnthropic(r, model)
+	out := buildAnthropic(r, model)
+	if r.Fast && host == "api.anthropic.com" && provider.ClaudeFast(model) {
+		// Claude's fast mode, on the models that have it (its beta header
+		// goes with it: forwardOnce)
+		out = withFields(out, map[string]any{"speed": "fast"})
+	}
+	return out
 }
 
 func decoder(proto provider.Protocol) func(data string, emit func(Event)) error {
