@@ -90,12 +90,17 @@ func TestCodexOwnModelTraced(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", CodexPath+"/responses", strings.NewReader(`{"model":"gpt-5.5","stream":true,"input":"hi"}`))
 	req.Header.Set("Authorization", "Bearer chatgpt-token")
+	req.Header.Set("session_id", "codex-conversation")
+	req.Header.Set("x-codex-turn-metadata", `{"thread_source":"thread_title","forked_from_thread_id":"main-conversation"}`)
 	s.Handler().ServeHTTP(rec, req)
 	st := s.Trace(t.Context(), 0, 0)
 	if len(st.Routes) != 1 {
 		t.Fatalf("routes %+v", st.Routes)
 	}
 	r := st.Routes[0]
+	if r.Session != "codex-conversation" || r.ParentSession != "main-conversation" || r.Kind != "thread_title" || len(r.Usage) != 1 || r.Usage[0].Provider != "openai" || r.Usage[0].Input != 9 || r.Usage[0].Output != 2 {
+		t.Fatalf("session accounting: %+v", r)
+	}
 	if !r.Done || r.Status != 200 || r.Model != "gpt-5.5" || r.Tokens != 11 ||
 		len(r.Order) != 1 || r.Order[0].Who != "Codex's own sign-in" || len(r.Tries) != 1 || !r.Tries[0].Done || r.Tries[0].Status != 200 {
 		t.Errorf("route %+v", r)

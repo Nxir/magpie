@@ -8,13 +8,55 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/gateway"
+	"github.com/yetone/magpie/internal/sessions"
+	"github.com/yetone/magpie/internal/usage"
 )
 
 // traceJSON is the gateway's routing trace since the page last asked.
 type traceJSON struct {
 	gateway.TraceState
-	Mine bool      `json:"mine"` // this magpie serves the gateway: another's trace isn't here
-	Now  time.Time `json:"now"`
+	Mine   bool        `json:"mine"` // this magpie serves the gateway: another's trace isn't here
+	Now    time.Time   `json:"now"`
+	Routes []routeJSON `json:"routes"`
+}
+
+type routeJSON struct {
+	gateway.Route
+	SessionTitle string  `json:"sessionTitle,omitempty"`
+	Cost         float64 `json:"cost"`
+	Priced       bool    `json:"priced"`
+	Unpriced     int     `json:"unpriced"`
+}
+
+func pricedRoutes(routes []gateway.Route) []routeJSON {
+	out := make([]routeJSON, 0, len(routes))
+	priceOf := usage.NewPricer()
+	ids := make([]string, 0, len(routes))
+	for _, r := range routes {
+		if r.Agent == "codex" {
+			id := r.Session
+			if r.ParentSession != "" {
+				id = r.ParentSession
+			}
+			ids = append(ids, id)
+		}
+	}
+	titles := sessions.CodexTitles(ids)
+	for _, r := range routes {
+		sum := priceOf(r.Usage)
+		// Old history and calls without token counts stay unknown, not free.
+		priced := sum.Calls > sum.Unpriced && sum.Input+sum.Output > 0
+		name := ""
+		if r.Agent == "codex" {
+			id := r.Session
+			if r.ParentSession != "" {
+				id = r.ParentSession
+			}
+			name = titles[id]
+		}
+		out = append(out, routeJSON{Route: r, SessionTitle: name, Cost: sum.Cost, Priced: priced, Unpriced: sum.Unpriced})
+	}
+	return out
 }
 
 // mainView is the tab the window is asked to open on, as the page's view
@@ -43,6 +85,19 @@ func argView(s string) string { return url.QueryEscape(s) }
 // waits up to 25 s for something to change after the seq it is given, so
 // the page hears of a request as it happens.
 func traceRoutes(mux *http.ServeMux) {
+	// Names can arrive or change after a route finishes, independently of the
+	// trace sequence. Read only the IDs the page currently lists.
+	mux.HandleFunc("POST /api/gateway/session-titles", func(rw http.ResponseWriter, r *http.Request) {
+		var in struct {
+			IDs []string `json:"ids"`
+		}
+		r.Body = http.MaxBytesReader(rw, r.Body, 256<<10)
+		if json.NewDecoder(r.Body).Decode(&in) != nil || len(in.IDs) > 2000 {
+			http.Error(rw, "invalid session IDs", http.StatusBadRequest)
+			return
+		}
+		writeJSON(rw, sessions.CodexTitles(in.IDs))
+	})
 	mux.HandleFunc("GET /api/gateway/trace", func(rw http.ResponseWriter, r *http.Request) {
 		gw := served.Load()
 		out := traceJSON{TraceState: gateway.TraceState{Routes: []gateway.Route{}}, Mine: gw != nil}
@@ -55,13 +110,14 @@ func traceRoutes(mux *http.ServeMux) {
 			out.TraceState = gw.Trace(r.Context(), after, wait)
 		}
 		out.Now = time.Now()
+		out.Routes = pricedRoutes(out.TraceState.Routes)
 		writeJSON(rw, out)
 	})
 	// the routes of a day gone by, from the history the gateway keeps on
 	// disk — read whichever magpie serves the gateway
 	mux.HandleFunc("GET /api/gateway/history", func(rw http.ResponseWriter, r *http.Request) {
 		days, routes, cut := gateway.History(r.URL.Query().Get("day"))
-		writeJSON(rw, map[string]any{"days": days, "routes": routes, "cut": cut})
+		writeJSON(rw, map[string]any{"days": days, "routes": pricedRoutes(routes), "cut": cut})
 	})
 	// an account's rest lifted by hand: verified with its vendor, say
 	mux.HandleFunc("POST /api/gateway/unrest", func(rw http.ResponseWriter, r *http.Request) {

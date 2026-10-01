@@ -23,17 +23,20 @@ const traceKeep = 60
 
 // Route is one request's way through routing.
 type Route struct {
-	Seq      int64     `json:"seq"` // the trace's count when it last changed
-	ID       int64     `json:"id"`
-	Time     time.Time `json:"time"`
-	Agent    string    `json:"agent"`
-	Kind     string    `json:"kind,omitempty"`   // what the call is for, as Call's
-	For      *CallFor  `json:"for,omitempty"`    // the request it was made for, as Call's
-	Model    string    `json:"model"`            // as the agent asked
-	Effort   string    `json:"effort,omitempty"` // the reasoning the agent asked for; "" for none
-	Provider string    `json:"provider"`         // the provider the model resolved to
-	Group    *GroupRef `json:"group,omitempty"`  // the routing group the agent asked for
-	Rule     *RuleHit  `json:"rule,omitempty"`   // the group's rules for it, when it has any
+	Seq           int64          `json:"seq"` // the trace's count when it last changed
+	ID            int64          `json:"id"`
+	Time          time.Time      `json:"time"`
+	Agent         string         `json:"agent"`
+	ParentSession string         `json:"parentSession,omitempty"` // title helper's explicit originating chat; does not affect routing
+	Session       string         `json:"session,omitempty"`       // the client's session id, never inferred from its model or account
+	Usage         []usage.Record `json:"usage,omitempty"`         // token tiers of billable tries; priced when read
+	Kind          string         `json:"kind,omitempty"`          // what the call is for, as Call's
+	For           *CallFor       `json:"for,omitempty"`           // the request it was made for, as Call's
+	Model         string         `json:"model"`                   // as the agent asked
+	Effort        string         `json:"effort,omitempty"`        // the reasoning the agent asked for; "" for none
+	Provider      string         `json:"provider"`                // the provider the model resolved to
+	Group         *GroupRef      `json:"group,omitempty"`         // the routing group the agent asked for
+	Rule          *RuleHit       `json:"rule,omitempty"`          // the group's rules for it, when it has any
 	// Nested: the rules of the groups in the group, down the way to the
 	// one that went first, each as it decided
 	Nested   []NestedRule `json:"nested,omitempty"`
@@ -298,6 +301,7 @@ func (t *trace) update(r *Route, f func(r *Route)) {
 			c.Order = append([]Weighed(nil), r.Order...)
 			c.Left = append([]Weighed(nil), r.Left...)
 			c.Tries = append([]Try{}, r.Tries...)
+			c.Usage = append([]usage.Record(nil), r.Usage...)
 			go saveRoute(c)
 		}
 	}
@@ -323,6 +327,7 @@ func (s *Server) Trace(ctx context.Context, after int64, wait time.Duration) Tra
 				c.Order = append([]Weighed(nil), r.Order...)
 				c.Left = append([]Weighed(nil), r.Left...)
 				c.Tries = append([]Try{}, r.Tries...)
+				c.Usage = append([]usage.Record(nil), r.Usage...)
 				st.Routes = append(st.Routes, c)
 			}
 		}
@@ -348,3 +353,13 @@ func (s *Server) Trace(ctx context.Context, after int64, wait time.Duration) Tra
 // swapped reports whether served is another model than sent: not the same
 // name, however dated, pinned or prefixed (usage.Swapped).
 func swapped(sent, served string) bool { return usage.Swapped(sent, served) }
+
+// routeUsage retains only what pricing needs, without another copy of the
+// request's metadata. Unknown token counts have no price, including failures.
+func routeUsage(id, model string, u Usage) []usage.Record {
+	if u.Input+u.Output == 0 {
+		return nil
+	}
+	return []usage.Record{{Provider: id, Model: model, Input: u.Input, Output: u.Output,
+		CacheRead: u.CacheRead, CacheWrite: u.CacheWrite, Reasoning: u.Reasoning}}
+}

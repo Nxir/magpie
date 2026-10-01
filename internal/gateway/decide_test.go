@@ -117,7 +117,7 @@ func TestSystemOneRoutesByPrefix(t *testing.T) {
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{"model": q.Model, "answers": map[string]any{"intent": map[string]any{"choice": "bug"}}})
+			json.NewEncoder(w).Encode(map[string]any{"model": q.Model, "answers": map[string]any{"intent": map[string]any{"choice": "bug"}}, "usage": map[string]int{"input_tokens": 10, "output_tokens": 2}})
 		}))
 		return srv, &hits, &mu, &status, &ctype, &failBody
 	}
@@ -138,6 +138,7 @@ func TestSystemOneRoutesByPrefix(t *testing.T) {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest("POST", path, strings.NewReader(body))
 		req.Header.Set("Authorization", "Bearer magpie")
+		req.Header.Set(SessionHeader, "decision-session")
 		s.Handler().ServeHTTP(rec, req)
 		return rec
 	}
@@ -147,6 +148,9 @@ func TestSystemOneRoutesByPrefix(t *testing.T) {
 	}
 	if n := len(s.trace.routes); n != 1 {
 		t.Fatalf("traced %d", n)
+	}
+	if r := s.trace.routes[0]; r.Session != "decision-session" || len(r.Usage) != 1 || r.Usage[0].Provider != "load-a" || r.Usage[0].Model != "jev-latest" {
+		t.Fatalf("decision accounting: %+v", r)
 	}
 	if r := s.trace.routes[0]; r.Provider != "load-a" || r.Model != "load-a/jev-latest" || !r.Done || r.Status != 200 || len(r.Tries) != 1 || r.Tries[0].Model != "jev-latest" || r.Tries[0].ID != "load-a" {
 		t.Fatalf("route %+v", r)

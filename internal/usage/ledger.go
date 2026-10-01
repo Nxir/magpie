@@ -144,13 +144,14 @@ func ledger(since time.Time, f Filter, recs []Record) (rows []Row, sum Totals, a
 // maker's (a subscription's, #224).
 func pricer() func(Record) *catalog.Price {
 	prices := map[string]*catalog.Price{}
+	s := settings.Load()
 	return func(r Record) *catalog.Price {
 		k := r.Provider + "/" + r.Model
 		if pr, ok := prices[k]; ok {
 			return pr
 		}
 		var pr *catalog.Price
-		v, ok := provider.EffectivePrice(r.Provider, r.Model)
+		v, ok := provider.EffectivePriceIn(s, r.Provider, r.Model)
 		if ok {
 			pr = &v
 		} else {
@@ -158,6 +159,23 @@ func pricer() func(Record) *catalog.Price {
 		}
 		prices[k] = pr
 		return pr
+	}
+}
+
+// NewPricer totals requests' token-bearing attempts at one snapshot of the
+// effective prices used by the ledger. Reuse it for one page of routes;
+// make it again on the next read so a changed tariff re-prices history.
+func NewPricer() func([]Record) Totals {
+	priceOf, renamed := pricer(), provider.Renamed()
+	return func(recs []Record) Totals {
+		var sum Totals
+		for _, r := range recs {
+			if id, ok := renamed[r.Provider]; ok {
+				r.Provider = id
+			}
+			sum.add(r, priceOf(r))
+		}
+		return sum
 	}
 }
 
