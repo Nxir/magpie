@@ -1,0 +1,9 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yetone/magpie/internal/gateway
+cpu: Apple M1 Pro
+BenchmarkTitleLinkRequest/FirstPromptWith5MBHistory-8         	     228	   1537323 ns/op	 5809481 B/op	      19 allocs/op
+BenchmarkTitleLinkRequest/FirstPromptWith5MBImage-8           	      31	  10666610 ns/op	 5810920 B/op	      35 allocs/op
+BenchmarkTitleLinkRequest/CachedWith5MBHistory-8              	  181011	      2014 ns/op	    1408 B/op	      25 allocs/op
+PASS
+ok  	github.com/yetone/magpie/internal/gateway	1.556s

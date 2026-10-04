@@ -1,0 +1,105 @@
+[
+  {
+    "seq": 4,
+    "id": 1791127403059,
+    "time": "2026-10-04T23:23:23.053251+08:00",
+    "agent": "codex",
+    "session": "main-test",
+    "titleLink": {
+      "scope": "hmac-sha256:eaa7f5602d484c6ff30958c825a65d58255fbfded247d11cf60e9d861618ad84",
+      "prompt": "hmac-sha256:a6de4735185f9d865edd0f75964e6c6d952eba338d0deafb4c33a32860973d96"
+    },
+    "usage": [
+      {
+        "provider": "fake",
+        "model": "m1",
+        "in": 30,
+        "out": 4
+      }
+    ],
+    "model": "fake/m1",
+    "provider": "fake",
+    "order": [
+      {
+        "id": "fake",
+        "provider": "fake",
+        "name": "Fake",
+        "kind": "provider",
+        "model": "m1",
+        "routing": "",
+        "used": 0
+      }
+    ],
+    "tries": [
+      {
+        "id": "fake",
+        "model": "m1",
+        "start": "2026-10-04T23:23:23.058063+08:00",
+        "done": true,
+        "status": 200,
+        "ms": 2,
+        "ttft": 2,
+        "firstText": 2
+      }
+    ],
+    "done": true,
+    "status": 200,
+    "ms": 8,
+    "tokens": 34,
+    "out": 4,
+    "ttft": 7,
+    "firstText": 7
+  },
+  {
+    "seq": 6,
+    "id": 1791127403060,
+    "time": "2026-10-04T23:23:23.078342+08:00",
+    "agent": "codex",
+    "session": "hidden-title-test",
+    "titleLink": {
+      "scope": "hmac-sha256:eaa7f5602d484c6ff30958c825a65d58255fbfded247d11cf60e9d861618ad84",
+      "prompt": "hmac-sha256:a6de4735185f9d865edd0f75964e6c6d952eba338d0deafb4c33a32860973d96",
+      "reply": "hmac-sha256:938e959f8478391a6b3aa71b6fca5b9d6ecd1bef4fa4ed9a0fccbab3043bb807"
+    },
+    "usage": [
+      {
+        "provider": "openai",
+        "model": "gpt-5.6-luna",
+        "in": 30,
+        "out": 4
+      }
+    ],
+    "kind": "thread_title",
+    "model": "gpt-5.6-luna",
+    "provider": "openai",
+    "order": [
+      {
+        "id": "codex",
+        "provider": "openai",
+        "name": "OpenAI",
+        "icon": "openai",
+        "who": "Codex's own sign-in",
+        "kind": "account",
+        "agent": "codex",
+        "model": "gpt-5.6-luna",
+        "routing": "",
+        "used": 0
+      }
+    ],
+    "tries": [
+      {
+        "id": "codex",
+        "model": "gpt-5.6-luna",
+        "start": "2026-10-04T23:23:23.078342+08:00",
+        "done": true,
+        "status": 200,
+        "ms": 2
+      }
+    ],
+    "done": true,
+    "status": 200,
+    "ms": 2,
+    "tokens": 34,
+    "out": 4
+  }
+]
