@@ -169,7 +169,7 @@ func (p *titlePrompts) observe(r *http.Request, body []byte, m sessionMetadata, 
 	return &link
 }
 
-func titleReplyDigest(body []byte, wrapped bool) string {
+func titleReplyDigest(body []byte, shape *titleShape) string {
 	if !gjson.ValidBytes(body) {
 		completed := false
 		readSSE(strings.NewReader(string(body)), func(_, data string) error {
@@ -192,8 +192,8 @@ func titleReplyDigest(body []byte, wrapped bool) string {
 		return ""
 	}
 	text := messageText(res)
-	if wrapped {
-		text = titleJSON(text)
+	if shape != nil {
+		text = titleJSON(text, *shape)
 	} // exactly the title handed to Codex
 
 	// A native reply must really contain the structured title Codex accepts.

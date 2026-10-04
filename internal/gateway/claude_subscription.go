@@ -45,6 +45,7 @@ import (
 	"github.com/yetone/magpie/internal/netproxy"
 	"github.com/yetone/magpie/internal/proc"
 	"github.com/yetone/magpie/internal/provider"
+	"github.com/yetone/magpie/internal/wslrun"
 )
 
 type subscriptionBridge struct {
@@ -244,6 +245,18 @@ func sweepBridgeProjects(claudeDir, tempDir string) {
 	}
 }
 
+// claudeRunDir is the folder every bridge run works in, the same one each
+// time: Claude Code writes its working directory into the system prompt,
+// so a folder of each run's own made every new turn's prompt a new one and
+// Anthropic's prompt cache was written again for the whole conversation and
+// never read — a long Claude Code conversation through magpie waited for
+// all of it each turn. A run's own files (tools.json) stay in its own
+// folder, which isn't in the prompt.
+func claudeRunDir() (string, error) {
+	dir := filepath.Join(os.TempDir(), "magpie-claude")
+	return dir, os.MkdirAll(dir, 0o700)
+}
+
 func evalSymlinks(path string) string {
 	if p, err := filepath.EvalSymlinks(path); err == nil {
 		return p
@@ -263,17 +276,62 @@ func randomToken() string {
 	return hex.EncodeToString(b[:])
 }
 
-func claudeBinary() (string, error) {
+// claudeCLI is the Claude Code magpie runs: this machine's, or, on Windows
+// without one, the one installed in a running WSL distro, run there with
+// its own login and quota (wslrun).
+type claudeCLI struct {
+	path string
+	wsl  *wslrun.Tool
+}
+
+func claudeBinary() (claudeCLI, error) {
 	if p, err := exec.LookPath("claude"); err == nil {
-		return p, nil
+		return claudeCLI{path: p}, nil
 	}
 	home, _ := os.UserHomeDir()
 	for _, p := range []string{filepath.Join(home, ".local", "bin", "claude"), "/usr/local/bin/claude", "/opt/homebrew/bin/claude"} {
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
-			return p, nil
+			return claudeCLI{path: p}, nil
 		}
 	}
-	return "", errors.New("Claude Code is not installed; install it and run `claude auth login`")
+	if t, ok := wslrun.Find("claude"); ok {
+		return claudeCLI{wsl: &t}, nil
+	}
+	return claudeCLI{}, errors.New("Claude Code is not installed; install it and run `claude auth login`")
+}
+
+func (c claudeCLI) command(ctx context.Context, args ...string) *exec.Cmd {
+	if c.wsl != nil {
+		return c.wsl.Command(ctx, args...)
+	}
+	return proc.CommandContext(ctx, c.path, args...)
+}
+
+// claudeEnvVars are the variables magpie sets for a Claude Code run, which
+// one in WSL is handed (wslrun's Env).
+var claudeEnvVars = []string{"ENABLE_CLAUDEAI_MCP_SERVERS", "DISABLE_AUTO_COMPACT", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+	"DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING", "DISABLE_AUTOUPDATER"}
+
+// env is env for a run in config directory configDir ("" for the account
+// Claude Code is signed in to): for one in WSL, what of it goes in.
+func (c claudeCLI) env(env []string, configDir string) []string {
+	env = inClaudeDir(env, configDir)
+	if c.wsl == nil {
+		return env
+	}
+	names := claudeEnvVars
+	if configDir != "" {
+		names = append(slices.Clone(names), "CLAUDE_CONFIG_DIR/p")
+	}
+	return c.wsl.Env(env, names...)
+}
+
+// exe is magpie's own executable, as this Claude Code starts it.
+func (c claudeCLI) exe() (string, error) {
+	if c.wsl != nil {
+		return c.wsl.Exe()
+	}
+	return os.Executable()
 }
 
 func callbackBaseURL() string {
@@ -293,7 +351,7 @@ func (b *subscriptionBridge) start(ctx context.Context, req *Request, model, con
 	if err != nil {
 		return nil, nil, err
 	}
-	exe, err := os.Executable()
+	exe, err := binary.exe()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -321,10 +379,14 @@ func (b *subscriptionBridge) start(ctx context.Context, req *Request, model, con
 	if len(req.Schema) > 0 {
 		args = append(args, "--json-schema", string(req.Schema))
 	}
-	cmd := proc.CommandContext(context.Background(), binary, args...)
-	cmd.Dir = tmp
-	cmd.Env = netproxy.EnvWith(claudeProxy(ctx), cleanClaudeEnv(os.Environ()))
-	cmd.Env = inClaudeDir(cmd.Env, configDir)
+	cwd, err := claudeRunDir()
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	cmd := binary.command(context.Background(), args...)
+	cmd.Dir = cwd
+	cmd.Env = binary.env(netproxy.EnvWith(claudeProxy(ctx), cleanClaudeEnv(os.Environ())), configDir)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		cleanup()

@@ -67,25 +67,25 @@ func TestTitleReplyEvidence(t *testing.T) {
 		return b
 	}
 	want := sessions.CodexTitleDigest("完成标题关联测试")
-	if got := titleReplyDigest(response(`{"title":"完成标题关联测试"}`), false); got != want {
+	if got := titleReplyDigest(response(`{"title":"完成标题关联测试"}`), nil); got != want {
 		t.Fatalf("JSON reply: %s", got)
 	}
 	stream := fmt.Sprintf("data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":%q}]}}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-test\",\"output\":[]}}\n\n", `{"title":"完成标题关联测试"}`)
-	if got := titleReplyDigest([]byte(stream), false); got != want {
+	if got := titleReplyDigest([]byte(stream), nil); got != want {
 		t.Fatalf("native output_item.done: %s", got)
 	}
-	if titleReplyDigest(response("完成标题关联测试"), false) != "" {
+	if titleReplyDigest(response("完成标题关联测试"), nil) != "" {
 		t.Fatal("native plain text accepted")
 	}
-	if titleReplyDigest(response("完成标题关联测试"), true) != want {
+	if titleReplyDigest(response("完成标题关联测试"), &titleShape{}) != want {
 		t.Fatal("wrapped title differs from the title handed to Codex")
 	}
 	for _, text := range []string{`{"title":7}`, `{"title":""}`, `{"other":"title"}`} {
-		if titleReplyDigest(response(text), false) != "" {
+		if titleReplyDigest(response(text), nil) != "" {
 			t.Fatalf("invalid title accepted: %s", text)
 		}
 	}
-	if titleReplyDigest([]byte(stream+"data: {\"type\":\"response.failed\"}\n\n"), false) != "" {
+	if titleReplyDigest([]byte(stream+"data: {\"type\":\"response.failed\"}\n\n"), nil) != "" {
 		t.Fatal("failed stream accepted")
 	}
 }
@@ -304,8 +304,20 @@ func BenchmarkTitleLinkRequest(b *testing.B) {
 // Real gateway requests, not pre-filled parentSession fields: both native
 // Codex and Magpie's title wrapper retain enough evidence for the GUI.
 func TestTitleLinkGatewayTransports(t *testing.T) {
-	for _, native := range []bool{true, false} {
-		t.Run(fmt.Sprint("native=", native), func(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		native, schema bool
+	}{
+		{name: "native", native: true},
+		{name: "translated"},
+		{name: "translated clipped title and description", schema: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			native := tc.native
+			appliedTitle := "完成标题关联测试"
+			if tc.schema {
+				appliedTitle = "完成标题"
+			}
 			t.Setenv("CODEX_HOME", t.TempDir())
 			f := &fake{t: t, reply: sse(`data: {"id":"c1","choices":[{"index":0,"delta":{"content":"完成标题关联测试"}}]}`, `data: {"id":"c1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":30,"completion_tokens":4}}`, `data: [DONE]`)}
 			setup(t, provider.Chat, f)
@@ -320,6 +332,12 @@ func TestTitleLinkGatewayTransports(t *testing.T) {
 				var body map[string]any
 				json.Unmarshal(linkBody(prompt), &body)
 				body["model"], body["stream"] = model, true
+				if tc.schema && kind == "thread_title" {
+					body["text"] = map[string]any{"format": map[string]any{"type": "json_schema", "schema": map[string]any{
+						"type": "object", "properties": map[string]any{"title": map[string]any{"type": "string", "maxLength": 4}, "description": map[string]string{"type": "string"}},
+						"required": []string{"title", "description"},
+					}}}
+				}
 				meta, _ := json.Marshal(sessionMetadata{Source: kind, Installation: "test-installation"})
 				body["client_metadata"] = map[string]string{"x-codex-turn-metadata": string(meta)}
 				raw, _ := json.Marshal(body)
@@ -344,6 +362,9 @@ func TestTitleLinkGatewayTransports(t *testing.T) {
 				if w.Code != 200 {
 					t.Fatalf("request %s: %d %s", kind, w.Code, w.Body)
 				}
+				if kind == "thread_title" && titleReplyDigest(w.Body.Bytes(), nil) != sessions.CodexTitleDigest(appliedTitle) {
+					t.Fatal("caller received a different title from the recorded association evidence")
+				}
 			}
 			mainPath := "/v1/responses"
 			if native {
@@ -362,7 +383,7 @@ func TestTitleLinkGatewayTransports(t *testing.T) {
 			if got := s.ResolveTitleParents(rows); got[1].ParentSession != "" {
 				t.Fatal("inferred before Codex applied title")
 			}
-			line := fmt.Sprintf("{\"id\":\"main-test\",\"thread_name\":\"完成标题关联测试\",\"updated_at\":%q}\n", time.Now().UTC().Format(time.RFC3339Nano))
+			line := fmt.Sprintf("{\"id\":\"main-test\",\"thread_name\":%q,\"updated_at\":%q}\n", appliedTitle, time.Now().UTC().Format(time.RFC3339Nano))
 			os.WriteFile(filepath.Join(sessions.CodexDir(), "session_index.jsonl"), []byte(line), 0600)
 			if got := s.ResolveTitleParents(rows); got[1].ParentSession != "main-test" || !got[1].ParentMatched {
 				t.Fatalf("transport did not resolve: %+v", got[1])

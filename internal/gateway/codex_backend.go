@@ -329,7 +329,7 @@ func (s *Server) codexUpstream(w http.ResponseWriter, r *http.Request, rest stri
 			ttft, text := first.ms()
 			replyDigest := ""
 			if captureTitle && status < 400 && msg == "" && !titleReply.truncated {
-				replyDigest = titleReplyDigest(titleReply.buf.Bytes(), false)
+				replyDigest = titleReplyDigest(titleReply.buf.Bytes(), nil)
 			}
 			s.trace.update(tr, func(t *Route) {
 				t.Tries[0].Done, t.Tries[0].Status, t.Tries[0].Millis, t.Tries[0].Error = true, status, ms, msg
