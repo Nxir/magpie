@@ -1643,3 +1643,52 @@ compare the same completed API state rather than a loading-order difference.
 ```sh
 node --test internal/gui/tests/mobile-web.test.cjs internal/gui/tests/old-webkit.test.cjs
 ```
+
+## Automatic Codex title grouping
+
+Codex's hidden title turn sometimes sends only its own session ID. The fallback
+associates it for display only when the original text prompt and installation
+fingerprints agree, the successful reply contains a title, and exactly one
+local chat applies that title between the request start and two minutes after
+its completion. Actual name writes for chats unseen by Magpie also count as
+conflicts. Explicit parent metadata takes priority; uncertain cases stay separate
+without a confirmation dialog. A tooltip identifies inferred associations.
+
+`TestTitleLinkGatewayTransports` drives real gateway handlers with mock upstreams,
+covering compressed native Codex requests and translated title replies. The GUI
+API test verifies a late title write without a new trace event, persisted evidence
+after restart, renames and conflict revocation. The browser test checks group
+headings, counts, costs, folds and native request identity in both languages and
+engines. Multimodal first prompts, unfamiliar title templates, remote clients,
+missing installation IDs and old history without fingerprints remain independent.
+No conversation-file scan, model call or additional polling interval is added.
+
+To export gateway/API evidence and render before/after screenshots from it, run
+from the repository root with Go, Node and Playwright installed:
+
+```sh
+title_test_dir=$(mktemp -d)
+TITLE_LINK_FIXTURE_FILE="$title_test_dir/gateway-routes.json" \
+  go test -tags nogui ./internal/gateway -run '^TestTitleLinkGatewayTransports$' -count=1
+TITLE_LINK_FIXTURE_FILE="$title_test_dir/gateway-routes.json" ARTIFACT_DIR="$title_test_dir" \
+  go test -tags nogui ./internal/gui -run '^TestAutomaticTitleGroupsAPI$' -count=1
+TITLE_ASSOCIATION_FIXTURE="$title_test_dir/title-association.json" ARTIFACT_DIR="$title_test_dir" \
+  node --test --test-name-pattern='applied titles regroup' internal/gui/tests/routing-sessions.test.cjs
+```
+
+These screenshots are a reproducible local replay with synthetic IDs and mock
+upstreams, not a capture of a production Codex app. No credential or original user
+conversation is included. Run the browser file without the fixture variable for
+its regular standalone regressions.
+
+```sh
+go test -tags nogui ./internal/gateway ./internal/sessions -run '^$' \
+  -bench 'BenchmarkTitle(LinkRequest|ParentResolution)|BenchmarkCodexTitleIndex' -benchmem
+```
+
+The request cache inspects the original prompt once per chat, keeps at most 4,096
+chats, and stops inference on overflow. The name index caches unchanged files and
+reads appended complete lines; replacement/truncation rebuilds it. Dated evidence
+is limited to 100,000 writes from the recent history window, and overflow disables
+inference while normal names still display. History refresh reuses up to four
+already-loaded days of compact evidence rather than rereading routing logs.
