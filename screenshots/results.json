@@ -1,0 +1,505 @@
+{
+  "before": "7cc44b68a9afa0d92db689ff5ed0f5010a02b923",
+  "after": "0ae81b3c5a02a840d3d4983c9503cdbb1f86b291",
+  "simulated": true,
+  "fixture": [
+    {
+      "id": 1,
+      "seq": 1,
+      "time": "2026-10-04T05:07:30.000Z",
+      "agent": "codex",
+      "session": "10000000-0000-4000-8000-000000000003",
+      "kind": "",
+      "sessionTitle": "Extracurricular classes (simulated)",
+      "model": "codex/gpt-6.1-sol",
+      "provider": "codex",
+      "order": [
+        {
+          "id": "codex",
+          "provider": "codex",
+          "name": "Codex",
+          "who": "Simulated account",
+          "kind": "account",
+          "model": "gpt-6.1-sol"
+        }
+      ],
+      "tries": [
+        {
+          "id": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "start": "2026-10-04T05:07:30.000Z",
+          "done": true,
+          "status": 200,
+          "ms": 5600,
+          "ttft": 1800
+        }
+      ],
+      "done": true,
+      "status": 200,
+      "ms": 5600,
+      "tokens": 28000,
+      "ttft": 1800,
+      "priced": true,
+      "cost": 0.01
+    },
+    {
+      "id": 2,
+      "seq": 2,
+      "time": "2026-10-04T05:07:40.000Z",
+      "agent": "codex",
+      "session": "10000000-0000-4000-8000-000000000003",
+      "kind": "memory_consolidation",
+      "sessionTitle": "Extracurricular classes (simulated)",
+      "model": "codex/gpt-5.6-terra",
+      "provider": "codex",
+      "order": [
+        {
+          "id": "codex",
+          "provider": "codex",
+          "name": "Codex",
+          "who": "Simulated account",
+          "kind": "account",
+          "model": "gpt-5.6-terra"
+        }
+      ],
+      "tries": [
+        {
+          "id": "codex",
+          "model": "gpt-5.6-terra",
+          "effort": "medium",
+          "start": "2026-10-04T05:07:40.000Z",
+          "done": true,
+          "status": 200,
+          "ms": 5600,
+          "ttft": 1800
+        }
+      ],
+      "done": true,
+      "status": 200,
+      "ms": 5600,
+      "tokens": 28000,
+      "ttft": 1800,
+      "priced": true,
+      "cost": 0.02
+    },
+    {
+      "id": 3,
+      "seq": 3,
+      "time": "2026-10-04T05:07:50.000Z",
+      "agent": "codex",
+      "session": "10000000-0000-4000-8000-000000000001",
+      "kind": "memory_consolidation",
+      "sessionTitle": "",
+      "model": "codex/gpt-5.6-terra",
+      "provider": "codex",
+      "order": [
+        {
+          "id": "codex",
+          "provider": "codex",
+          "name": "Codex",
+          "who": "Simulated account",
+          "kind": "account",
+          "model": "gpt-5.6-terra"
+        }
+      ],
+      "tries": [
+        {
+          "id": "codex",
+          "model": "gpt-5.6-terra",
+          "effort": "medium",
+          "start": "2026-10-04T05:07:50.000Z",
+          "done": true,
+          "status": 200,
+          "ms": 5600,
+          "ttft": 1800
+        }
+      ],
+      "done": true,
+      "status": 200,
+      "ms": 5600,
+      "tokens": 28000,
+      "ttft": 1800,
+      "priced": true,
+      "cost": 0.03
+    },
+    {
+      "id": 4,
+      "seq": 4,
+      "time": "2026-10-04T05:08:00.000Z",
+      "agent": "codex",
+      "session": "10000000-0000-4000-8000-000000000001",
+      "kind": "memgen",
+      "sessionTitle": "",
+      "model": "codex/gpt-5.6-terra",
+      "provider": "codex",
+      "order": [
+        {
+          "id": "codex",
+          "provider": "codex",
+          "name": "Codex",
+          "who": "Simulated account",
+          "kind": "account",
+          "model": "gpt-5.6-terra"
+        }
+      ],
+      "tries": [
+        {
+          "id": "codex",
+          "model": "gpt-5.6-terra",
+          "effort": "medium",
+          "start": "2026-10-04T05:08:00.000Z",
+          "done": true,
+          "status": 200,
+          "ms": 5600,
+          "ttft": 1800
+        }
+      ],
+      "done": true,
+      "status": 200,
+      "ms": 5600,
+      "tokens": 28000,
+      "ttft": 1800,
+      "priced": true,
+      "cost": 0.04
+    },
+    {
+      "id": 5,
+      "seq": 5,
+      "time": "2026-10-04T05:08:10.000Z",
+      "agent": "codex",
+      "session": "10000000-0000-4000-8000-000000000002",
+      "kind": "memory",
+      "sessionTitle": "",
+      "model": "codex/gpt-5.6-terra",
+      "provider": "codex",
+      "order": [
+        {
+          "id": "codex",
+          "provider": "codex",
+          "name": "Codex",
+          "who": "Simulated account",
+          "kind": "account",
+          "model": "gpt-5.6-terra"
+        }
+      ],
+      "tries": [
+        {
+          "id": "codex",
+          "model": "gpt-5.6-terra",
+          "effort": "medium",
+          "start": "2026-10-04T05:08:10.000Z",
+          "done": true,
+          "status": 200,
+          "ms": 5600,
+          "ttft": 1800
+        }
+      ],
+      "done": true,
+      "status": 200,
+      "ms": 5600,
+      "tokens": 28000,
+      "ttft": 1800,
+      "priced": true,
+      "cost": 0.05
+    },
+    {
+      "id": 6,
+      "seq": 6,
+      "time": "2026-10-04T05:08:20.000Z",
+      "agent": "codex",
+      "session": "10000000-0000-4000-8000-000000000001",
+      "kind": "memory_consolidation",
+      "sessionTitle": "",
+      "model": "codex/gpt-5.6-terra",
+      "provider": "codex",
+      "order": [
+        {
+          "id": "codex",
+          "provider": "codex",
+          "name": "Codex",
+          "who": "Simulated account",
+          "kind": "account",
+          "model": "gpt-5.6-terra"
+        }
+      ],
+      "tries": [
+        {
+          "id": "codex",
+          "model": "gpt-5.6-terra",
+          "effort": "medium",
+          "start": "2026-10-04T05:08:20.000Z",
+          "done": true,
+          "status": 200,
+          "ms": 5600,
+          "ttft": 1800
+        }
+      ],
+      "done": true,
+      "status": 200,
+      "ms": 5600,
+      "tokens": 28000,
+      "ttft": 1800,
+      "priced": true,
+      "cost": 0.06
+    }
+  ],
+  "cases": [
+    {
+      "engine": "chromium",
+      "lang": "en",
+      "version": "before",
+      "ref": "7cc44b68a9afa0d92db689ff5ed0f5010a02b923",
+      "screenshot": "chromium-en-before.png",
+      "groups": [
+        {
+          "name": "Codex · 10000000-0000-4000-8000-000000000001",
+          "tooltip": "Session id: 10000000-0000-4000-8000-000000000001",
+          "summary": "3 requests · 84.0k tokens",
+          "cost": "≈$0.130"
+        },
+        {
+          "name": "Codex · 10000000-0000-4000-8000-000000000002",
+          "tooltip": "Session id: 10000000-0000-4000-8000-000000000002",
+          "summary": "1 request · 28.0k tokens",
+          "cost": "≈$0.050"
+        },
+        {
+          "name": "Codex · Extracurricular classes (simulated)",
+          "tooltip": "Extracurricular classes (simulated)\nSession id: 10000000-0000-4000-8000-000000000003",
+          "summary": "2 requests · 56.0k tokens",
+          "cost": "≈$0.030"
+        }
+      ],
+      "liveUpdate": "passed",
+      "folds": "passed",
+      "byRequestCount": 7,
+      "narrow": "passed",
+      "errors": []
+    },
+    {
+      "engine": "chromium",
+      "lang": "en",
+      "version": "after",
+      "ref": "0ae81b3c5a02a840d3d4983c9503cdbb1f86b291",
+      "screenshot": "chromium-en-after.png",
+      "groups": [
+        {
+          "name": "Codex · Background memory task",
+          "tooltip": "Background memory task\nCodex is organizing memories from earlier chats in the background. This can continue after a chat finishes.\nSession id: 10000000-0000-4000-8000-000000000001",
+          "summary": "3 requests · 84.0k tokens",
+          "cost": "≈$0.130"
+        },
+        {
+          "name": "Codex · Background memory task",
+          "tooltip": "Background memory task\nCodex is organizing memories from earlier chats in the background. This can continue after a chat finishes.\nSession id: 10000000-0000-4000-8000-000000000002",
+          "summary": "1 request · 28.0k tokens",
+          "cost": "≈$0.050"
+        },
+        {
+          "name": "Codex · Extracurricular classes (simulated)",
+          "tooltip": "Extracurricular classes (simulated)\nSession id: 10000000-0000-4000-8000-000000000003",
+          "summary": "2 requests · 56.0k tokens",
+          "cost": "≈$0.030"
+        }
+      ],
+      "liveUpdate": "passed",
+      "folds": "passed",
+      "byRequestCount": 7,
+      "narrow": "passed",
+      "errors": []
+    },
+    {
+      "engine": "chromium",
+      "lang": "zh",
+      "version": "before",
+      "ref": "7cc44b68a9afa0d92db689ff5ed0f5010a02b923",
+      "screenshot": "chromium-zh-before.png",
+      "groups": [
+        {
+          "name": "Codex · 10000000-0000-4000-8000-000000000001",
+          "tooltip": "会话 ID: 10000000-0000-4000-8000-000000000001",
+          "summary": "3 个请求 · 84.0k token",
+          "cost": "≈$0.130"
+        },
+        {
+          "name": "Codex · 10000000-0000-4000-8000-000000000002",
+          "tooltip": "会话 ID: 10000000-0000-4000-8000-000000000002",
+          "summary": "1 个请求 · 28.0k token",
+          "cost": "≈$0.050"
+        },
+        {
+          "name": "Codex · 课外班讨论（模拟）",
+          "tooltip": "课外班讨论（模拟）\n会话 ID: 10000000-0000-4000-8000-000000000003",
+          "summary": "2 个请求 · 56.0k token",
+          "cost": "≈$0.030"
+        }
+      ],
+      "liveUpdate": "passed",
+      "folds": "passed",
+      "byRequestCount": 7,
+      "narrow": "passed",
+      "errors": []
+    },
+    {
+      "engine": "chromium",
+      "lang": "zh",
+      "version": "after",
+      "ref": "0ae81b3c5a02a840d3d4983c9503cdbb1f86b291",
+      "screenshot": "chromium-zh-after.png",
+      "groups": [
+        {
+          "name": "Codex · 后台记忆整理",
+          "tooltip": "后台记忆整理\nCodex 正在后台整理历史聊天中的记忆，回答结束后也可能继续运行。\n会话 ID: 10000000-0000-4000-8000-000000000001",
+          "summary": "3 个请求 · 84.0k token",
+          "cost": "≈$0.130"
+        },
+        {
+          "name": "Codex · 后台记忆整理",
+          "tooltip": "后台记忆整理\nCodex 正在后台整理历史聊天中的记忆，回答结束后也可能继续运行。\n会话 ID: 10000000-0000-4000-8000-000000000002",
+          "summary": "1 个请求 · 28.0k token",
+          "cost": "≈$0.050"
+        },
+        {
+          "name": "Codex · 课外班讨论（模拟）",
+          "tooltip": "课外班讨论（模拟）\n会话 ID: 10000000-0000-4000-8000-000000000003",
+          "summary": "2 个请求 · 56.0k token",
+          "cost": "≈$0.030"
+        }
+      ],
+      "liveUpdate": "passed",
+      "folds": "passed",
+      "byRequestCount": 7,
+      "narrow": "passed",
+      "errors": []
+    },
+    {
+      "engine": "webkit",
+      "lang": "en",
+      "version": "before",
+      "ref": "7cc44b68a9afa0d92db689ff5ed0f5010a02b923",
+      "screenshot": "webkit-en-before.png",
+      "groups": [
+        {
+          "name": "Codex · 10000000-0000-4000-8000-000000000001",
+          "tooltip": "Session id: 10000000-0000-4000-8000-000000000001",
+          "summary": "3 requests · 84.0k tokens",
+          "cost": "≈$0.130"
+        },
+        {
+          "name": "Codex · 10000000-0000-4000-8000-000000000002",
+          "tooltip": "Session id: 10000000-0000-4000-8000-000000000002",
+          "summary": "1 request · 28.0k tokens",
+          "cost": "≈$0.050"
+        },
+        {
+          "name": "Codex · Extracurricular classes (simulated)",
+          "tooltip": "Extracurricular classes (simulated)\nSession id: 10000000-0000-4000-8000-000000000003",
+          "summary": "2 requests · 56.0k tokens",
+          "cost": "≈$0.030"
+        }
+      ],
+      "liveUpdate": "passed",
+      "folds": "passed",
+      "byRequestCount": 7,
+      "narrow": "passed",
+      "errors": []
+    },
+    {
+      "engine": "webkit",
+      "lang": "en",
+      "version": "after",
+      "ref": "0ae81b3c5a02a840d3d4983c9503cdbb1f86b291",
+      "screenshot": "webkit-en-after.png",
+      "groups": [
+        {
+          "name": "Codex · Background memory task",
+          "tooltip": "Background memory task\nCodex is organizing memories from earlier chats in the background. This can continue after a chat finishes.\nSession id: 10000000-0000-4000-8000-000000000001",
+          "summary": "3 requests · 84.0k tokens",
+          "cost": "≈$0.130"
+        },
+        {
+          "name": "Codex · Background memory task",
+          "tooltip": "Background memory task\nCodex is organizing memories from earlier chats in the background. This can continue after a chat finishes.\nSession id: 10000000-0000-4000-8000-000000000002",
+          "summary": "1 request · 28.0k tokens",
+          "cost": "≈$0.050"
+        },
+        {
+          "name": "Codex · Extracurricular classes (simulated)",
+          "tooltip": "Extracurricular classes (simulated)\nSession id: 10000000-0000-4000-8000-000000000003",
+          "summary": "2 requests · 56.0k tokens",
+          "cost": "≈$0.030"
+        }
+      ],
+      "liveUpdate": "passed",
+      "folds": "passed",
+      "byRequestCount": 7,
+      "narrow": "passed",
+      "errors": []
+    },
+    {
+      "engine": "webkit",
+      "lang": "zh",
+      "version": "before",
+      "ref": "7cc44b68a9afa0d92db689ff5ed0f5010a02b923",
+      "screenshot": "webkit-zh-before.png",
+      "groups": [
+        {
+          "name": "Codex · 10000000-0000-4000-8000-000000000001",
+          "tooltip": "会话 ID: 10000000-0000-4000-8000-000000000001",
+          "summary": "3 个请求 · 84.0k token",
+          "cost": "≈$0.130"
+        },
+        {
+          "name": "Codex · 10000000-0000-4000-8000-000000000002",
+          "tooltip": "会话 ID: 10000000-0000-4000-8000-000000000002",
+          "summary": "1 个请求 · 28.0k token",
+          "cost": "≈$0.050"
+        },
+        {
+          "name": "Codex · 课外班讨论（模拟）",
+          "tooltip": "课外班讨论（模拟）\n会话 ID: 10000000-0000-4000-8000-000000000003",
+          "summary": "2 个请求 · 56.0k token",
+          "cost": "≈$0.030"
+        }
+      ],
+      "liveUpdate": "passed",
+      "folds": "passed",
+      "byRequestCount": 7,
+      "narrow": "passed",
+      "errors": []
+    },
+    {
+      "engine": "webkit",
+      "lang": "zh",
+      "version": "after",
+      "ref": "0ae81b3c5a02a840d3d4983c9503cdbb1f86b291",
+      "screenshot": "webkit-zh-after.png",
+      "groups": [
+        {
+          "name": "Codex · 后台记忆整理",
+          "tooltip": "后台记忆整理\nCodex 正在后台整理历史聊天中的记忆，回答结束后也可能继续运行。\n会话 ID: 10000000-0000-4000-8000-000000000001",
+          "summary": "3 个请求 · 84.0k token",
+          "cost": "≈$0.130"
+        },
+        {
+          "name": "Codex · 后台记忆整理",
+          "tooltip": "后台记忆整理\nCodex 正在后台整理历史聊天中的记忆，回答结束后也可能继续运行。\n会话 ID: 10000000-0000-4000-8000-000000000002",
+          "summary": "1 个请求 · 28.0k token",
+          "cost": "≈$0.050"
+        },
+        {
+          "name": "Codex · 课外班讨论（模拟）",
+          "tooltip": "课外班讨论（模拟）\n会话 ID: 10000000-0000-4000-8000-000000000003",
+          "summary": "2 个请求 · 56.0k token",
+          "cost": "≈$0.030"
+        }
+      ],
+      "liveUpdate": "passed",
+      "folds": "passed",
+      "byRequestCount": 7,
+      "narrow": "passed",
+      "errors": []
+    }
+  ]
+}
