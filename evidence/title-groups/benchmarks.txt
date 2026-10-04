@@ -1,0 +1,19 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yetone/magpie/internal/gateway
+cpu: Apple M1 Pro
+BenchmarkTitleLinkRequest/FirstPromptWith5MBHistory-8         	     390	   1488165 ns/op	 5809229 B/op	      15 allocs/op
+BenchmarkTitleLinkRequest/CachedWith5MBHistory-8              	  305809	      2011 ns/op	    1408 B/op	      25 allocs/op
+BenchmarkTitleParentResolution/60Rows4000Chats-8              	   69800	      8329 ns/op	   30576 B/op	      14 allocs/op
+BenchmarkTitleParentResolution/2000Rows4000Chats-8            	    3630	    165120 ns/op	  919408 B/op	      14 allocs/op
+PASS
+ok  	github.com/yetone/magpie/internal/gateway	2.806s
+goos: darwin
+goarch: arm64
+pkg: github.com/yetone/magpie/internal/sessions
+cpu: Apple M1 Pro
+BenchmarkCodexTitleIndex/Cold10k-8         	      20	  26797383 ns/op	19129738 B/op	  250253 allocs/op
+BenchmarkCodexTitleIndex/Cached10k-8       	  280926	      2003 ns/op	     656 B/op	       4 allocs/op
+BenchmarkCodexTitleIndex/Append10k-8       	   12458	     47825 ns/op	    5536 B/op	      22 allocs/op
+PASS
+ok  	github.com/yetone/magpie/internal/sessions	1.958s
