@@ -30,7 +30,13 @@ function serve(lang, feed, fixture = initial) {
       return json({ mine: true, now: now.toISOString(), seq: routes.at(-1)?.seq || 1, totals: { requests: 6, rerouted: 0, errors: 0 }, routes });
     }
     if (url.pathname === "/api/gateway/history") return json({ cut: false, days: [{ day, requests: fixture.length }], routes: url.searchParams.get("day") ? fixture : [] });
-    if (url.pathname === "/api/gateway/session-titles") return json(feed.names || {});
+    if (url.pathname === "/api/gateway/route" && feed.route) return json(feed.route);
+    if (url.pathname === "/api/gateway/session-titles") {
+      const input = route.request().postDataJSON();
+      feed.titleRequests?.push(input);
+      if (input.ids.length > 2000 || input.routeIds.length > 2000) return route.fulfill({ status: 400, body: "too many IDs" });
+      return json(typeof feed.names === "function" ? feed.names(input) : feed.names || {});
+    }
     if (url.pathname === "/api/clis") return json({ agents: [], providers: [] });
     if (url.pathname === "/api/groups") return json({ groups: [] });
     if (url.pathname === "/api/providers") return json({ providers: [], gateway: { running: true, window: true } });
@@ -347,5 +353,43 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await page.locator(".rt-req").count(), 3, "by-request view keeps native request identities");
       assert.deepEqual(errors, []);
     });
+  }
+}
+
+for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {
+  for (const lang of ["en", "zh"]) {
+    for (const mixed of [true, false]) {
+      test(`${engine} ${lang}: large ${mixed ? "mixed-agent" : "Codex"} history refresh includes an individually opened request`, async (t) => {
+        const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
+        const page = await browser.newPage({ viewport: { width: 1100, height: 800 }, reducedMotion: "reduce" });
+        page.setDefaultTimeout(10000);
+        const errors = [], titleRequests = [];
+        const fixture = Array.from({ length: 2000 }, (_, i) => ({ ...req(i + 1, mixed && i < 800 ? "claude" : "codex", `chat-${i + 1}`, 0.01), time: now.toISOString() }));
+        const extra = { ...req(2001, "codex", "opened-chat", 0.01), time: now.toISOString() };
+        const feed = { titleRequests, route: extra, names: ({ ids }) => ({ names: Object.fromEntries(ids.map((id) => [id, `Applied ${id}`])) }) };
+        page.on("pageerror", (e) => errors.push(e.message));
+        await page.route("**/*", serve(lang, feed, fixture));
+        t.after(async () => { feed.next?.([]); await browser.close(); });
+        await page.goto("http://magpie.test/?view=routing");
+        await page.locator(".rt-req").nth(59).waitFor(); // live trace retains only 60 rows
+        await page.locator(".rt-group-by button").nth(1).click();
+        // openRoute loads the full day, then appends a row outside its 2,000-row page.
+        await page.evaluate(({ id, time }) => window.openRoute(id, time), extra);
+        await page.locator(".rt-req").nth(2000).waitFor();
+        await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+        await page.waitForFunction(() => [...document.querySelectorAll(".rt-session .nm")].some((e) => e.textContent === "Codex · Applied opened-chat"));
+        const group = (id) => page.locator(`button.rt-session:has(.nm[title$="${id}"])`);
+        assert.equal(await group("chat-2000").locator(".nm").textContent(), "Codex · Applied chat-2000");
+        assert.equal(await group(mixed ? "chat-801" : "chat-1").locator(".nm").textContent(), `Codex · Applied chat-${mixed ? 801 : 1}`);
+        assert.equal(await group("opened-chat").locator(".cost").textContent(), "≈$0.010");
+        const batches = titleRequests.filter((input) => input.day === day);
+        assert(batches.length > 0, "history refresh never ran");
+        assert(batches.every((input) => input.ids.length <= 2000 && input.routeIds.length <= 2000), "API batch exceeded the ID limit");
+        assert(batches.some((input) => input.routeIds.includes(extra.id)), "individually opened row was omitted");
+        if (mixed) assert(batches.every((input) => input.routeIds.every((id) => id > 800)), "other agents were sent to the Codex title API");
+        else assert(batches.some((input) => input.routeIds.length === 2000) && batches.some((input) => input.routeIds.includes(2001)), "full Codex day was not split into batches");
+        assert.deepEqual(errors, []);
+      });
+    }
   }
 }

@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/klauspost/compress/zstd"
-	"github.com/yetone/magpie/internal/provider"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,8 +14,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
+
+	"github.com/yetone/magpie/internal/provider"
 	"github.com/yetone/magpie/internal/sessions"
+	"github.com/yetone/magpie/internal/settings"
 )
+
+func titleTestKey(t testing.TB) {
+	t.Helper()
+	if err := os.MkdirAll(settings.Dir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(settings.Dir(), "codex-title-key"), []byte(strings.Repeat("synthetic-title-key", 2)[:32]), 0600); err != nil {
+		t.Fatal(err)
+	}
+}
 
 const titleTemplate = "You are a helpful assistant. You will be presented with a user prompt, create a title.\n\nUser prompt:\n"
 
@@ -26,6 +38,8 @@ func linkBody(prompt string) []byte {
 	return b
 }
 func TestTitlePromptEvidence(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	titleTestKey(t)
 	prompt := "标题关联测试：请只回答测试完成。\n"
 	if a, b := titlePromptDigest(linkBody(prompt), false), titlePromptDigest(linkBody(titleTemplate+prompt), true); a == "" || a != b {
 		t.Fatalf("prompt mismatch: %s %s", a, b)
@@ -37,6 +51,7 @@ func TestTitlePromptEvidence(t *testing.T) {
 		{`{"input":[{"role":"user","content":[{"type":"input_text","text":"prompt"},{"type":"input_image","image_url":"x"}]}]}`, false},
 		{`{"input":[{"role":"assistant","content":"summary"},{"role":"user","content":"later turn"}]}`, false},
 		{string(linkBody("unrecognized title instructions")), true},
+		{`{"input":{"unexpected":{"role":"user","content":"prompt"}}}`, false},
 		{`{broken`, false},
 	} {
 		if got := titlePromptDigest([]byte(tc.body), tc.title); got != "" {
@@ -45,6 +60,8 @@ func TestTitlePromptEvidence(t *testing.T) {
 	}
 }
 func TestTitleReplyEvidence(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	titleTestKey(t)
 	response := func(text string) []byte {
 		b, _ := json.Marshal(map[string]any{"output": []any{map[string]any{"type": "message", "content": []any{map[string]string{"type": "output_text", "text": text}}}}})
 		return b
@@ -74,6 +91,8 @@ func TestTitleReplyEvidence(t *testing.T) {
 }
 
 func TestResolveTitleParents(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	titleTestKey(t)
 	at := time.Now().UTC().Truncate(time.Second)
 	link := TitleLink{Scope: "local", Prompt: promptDigest("unique prompt"), Reply: sessions.CodexTitleDigest("Applied title")}
 	main := Route{Agent: "codex", Session: "main", Time: at, TitleLink: &TitleLink{Scope: link.Scope, Prompt: link.Prompt}}
@@ -152,6 +171,8 @@ func TestResolveTitleParents(t *testing.T) {
 }
 
 func TestTitlePromptsCachedAndBounded(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	titleTestKey(t)
 	var p titlePrompts
 	req := httptest.NewRequest("POST", "/v1/responses", nil)
 	req.RemoteAddr = "127.0.0.1:1234"
@@ -185,12 +206,36 @@ func TestTitlePromptsCachedAndBounded(t *testing.T) {
 		req.Header.Set("Session-Id", fmt.Sprint(i))
 		p.observe(req, linkBody("same"), m, "", time.Now())
 	}
-	if len(p.first) != titlePromptLimit || !p.overflow {
-		t.Fatalf("bound failed: %d %t", len(p.first), p.overflow)
+	if len(p.first) != titlePromptLimit || p.recent.Len() != titlePromptLimit {
+		t.Fatalf("bound failed: %d", len(p.first))
 	}
+	scope := promptDigest(m.Installation)
+	if p.first[scope+":main"] != nil {
+		t.Fatal("oldest chat was not evicted")
+	}
+	// Touch chat 0, then force another eviction. New chats remain eligible.
+	req.Header.Set("Session-Id", "0")
+	p.observe(req, linkBody("later turn"), m, "", time.Now())
+	req.Header.Set("Session-Id", "new-after-limit")
+	if got := p.observe(req, linkBody("new prompt"), m, "", time.Now()); got == nil {
+		t.Fatal("cache limit disabled inference for new chats")
+	}
+	if p.first[scope+":0"] == nil || p.first[scope+":1"] != nil {
+		t.Fatal("did not evict the least recently used chat")
+	}
+	for _, entries := range p.byPrompt {
+		for _, entry := range entries {
+			if entry.Session == "main" || entry.Session == "1" {
+				t.Fatal("evicted chat kept stale candidate evidence")
+			}
+		}
+	}
+
 }
 
 func TestTitleParentSurvivesTraceEvictionAndHistory(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	titleTestKey(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
 	at := time.Now().UTC()
 	s := &Server{}
@@ -228,6 +273,8 @@ func TestTitleParentSurvivesTraceEvictionAndHistory(t *testing.T) {
 }
 
 func BenchmarkTitleLinkRequest(b *testing.B) {
+	b.Setenv("XDG_CONFIG_HOME", b.TempDir())
+	titleTestKey(b)
 	req := httptest.NewRequest("POST", "/responses", nil)
 	req.RemoteAddr = "127.0.0.1:1"
 	req.Header.Set("User-Agent", "codex/1.0")
@@ -262,6 +309,7 @@ func TestTitleLinkGatewayTransports(t *testing.T) {
 			t.Setenv("CODEX_HOME", t.TempDir())
 			f := &fake{t: t, reply: sse(`data: {"id":"c1","choices":[{"index":0,"delta":{"content":"完成标题关联测试"}}]}`, `data: {"id":"c1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":30,"completion_tokens":4}}`, `data: [DONE]`)}
 			setup(t, provider.Chat, f)
+			titleTestKey(t)
 			chatgpt(t, func(w http.ResponseWriter, r *http.Request) {
 				io.ReadAll(r.Body)
 				w.Header().Set("Content-Type", "text/event-stream")
@@ -330,6 +378,8 @@ func TestTitleLinkGatewayTransports(t *testing.T) {
 }
 
 func BenchmarkTitleParentResolution(b *testing.B) {
+	b.Setenv("XDG_CONFIG_HOME", b.TempDir())
+	titleTestKey(b)
 	at := time.Now()
 	s := &Server{}
 	req := httptest.NewRequest("POST", "/responses", nil)

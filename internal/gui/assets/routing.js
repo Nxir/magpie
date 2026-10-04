@@ -1332,13 +1332,25 @@
   let namesBusy = false;
   async function refreshSessionNames() {
     if (namesBusy || !shown()) return;
-    const rs = listed(), ids = [...new Set(rs.filter((r) => r.agent === "codex").map(groupSession).filter(Boolean))], sourceDay = day, routeIDs = new Set(rs.map((r) => r.id));
-    if (!ids.length) return;
+    const rs = listed().filter((r) => r.agent === "codex"), sourceDay = day, routeIDs = new Set(rs.map((r) => r.id));
+    if (!rs.some(groupSession)) return;
     namesBusy = true;
     try {
-      const res = await fetch("/api/gateway/session-titles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, groups: true, routeIds: [...routeIDs], day: sourceDay }) });
-      if (!res.ok) return;
-      const result = await res.json(), names = result.names || result;
+      const result = { names: {}, parents: {}, matched: {}, resetInferred: false };
+      // A full history day plus an individually opened older request can exceed
+      // the API's 2,000-row limit. Only Codex rows need names or associations.
+      for (let i = 0; i < rs.length; i += 2000) {
+        const batch = rs.slice(i, i + 2000), ids = [...new Set(batch.map(groupSession).filter(Boolean))];
+        const res = await fetch("/api/gateway/session-titles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, groups: true, routeIds: batch.map((r) => r.id), day: sourceDay }) });
+        if (!res.ok) return;
+        const part = await res.json();
+        if (day !== sourceDay) return;
+        Object.assign(result.names, part.names || part);
+        Object.assign(result.parents, part.parents);
+        Object.assign(result.matched, part.matched);
+        result.resetInferred ||= !!part.resetInferred;
+      }
+      const names = result.names;
       if (day !== sourceDay) return;
       let changed = false;
       for (const r of listed()) {

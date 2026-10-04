@@ -10,6 +10,7 @@ import (
 )
 
 func TestCodexTitlesRenameAndIsolation(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	path := filepath.Join(t.TempDir(), "session_index.jsonl")
 	old := []byte("{\"id\":\"main\",\"thread_name\":\"查询长沙天气\"}\n{\"id\":\"other\",\"thread_name\":\"另一个聊天\"}\n")
 	if err := os.WriteFile(path, old, 0600); err != nil {
@@ -42,6 +43,7 @@ func TestCodexTitlesRenameAndIsolation(t *testing.T) {
 }
 
 func TestCodexTitlesIncrementalApplications(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	dir := t.TempDir()
 	t.Setenv("CODEX_HOME", dir)
 	path := filepath.Join(dir, "session_index.jsonl")
@@ -93,6 +95,7 @@ func TestCodexTitlesIncrementalApplications(t *testing.T) {
 }
 
 func BenchmarkCodexTitleIndex(b *testing.B) {
+	b.Setenv("XDG_CONFIG_HOME", b.TempDir())
 	dir := b.TempDir()
 	path := filepath.Join(dir, "session_index.jsonl")
 	var data strings.Builder
@@ -128,6 +131,7 @@ func BenchmarkCodexTitleIndex(b *testing.B) {
 }
 
 func TestCodexTitleEvidenceBound(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("CODEX_HOME", t.TempDir())
 	var data strings.Builder
 	at := time.Now().UTC().Add(-time.Second)

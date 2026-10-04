@@ -1,8 +1,6 @@
 package gui
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -27,8 +25,14 @@ func TestAutomaticTitleGroupsAPI(t *testing.T) {
 	titleHistory.days = nil
 	titleHistory.Unlock()
 	at := time.Now().UTC()
-	sum := sha256.Sum256([]byte("test user prompt"))
-	first := gateway.TitleLink{Scope: "test-local-installation", Prompt: hex.EncodeToString(sum[:])}
+	// The optional gateway export uses this same synthetic test key.
+	if err := os.MkdirAll(settings.Dir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(settings.Dir(), "codex-title-key"), []byte(strings.Repeat("synthetic-title-key", 2)[:32]), 0600); err != nil {
+		t.Fatal(err)
+	}
+	first := gateway.TitleLink{Scope: "test-local-installation", Prompt: sessions.CodexPromptDigest("test user prompt")}
 	reply := first
 	reply.Reply = sessions.CodexTitleDigest("完成标题关联测试")
 	rows := []gateway.Route{

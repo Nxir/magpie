@@ -3,8 +3,6 @@ package sessions
 import (
 	"bufio"
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -45,8 +43,7 @@ func CodexTitleDigest(name string) string {
 	if name == "" {
 		return ""
 	}
-	sum := sha256.Sum256([]byte(name))
-	return hex.EncodeToString(sum[:])
+	return codexFingerprint("title", name)
 }
 
 // CodexTitles reads only the append-only name index. It caches unchanged

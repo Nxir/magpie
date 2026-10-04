@@ -1,10 +1,8 @@
 package gateway
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"container/list"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -28,32 +26,37 @@ type titlePrompt struct {
 }
 type titlePrompts struct {
 	sync.Mutex
-	first    map[string]titlePrompt
+	first    map[string]*list.Element
 	byPrompt map[string][]titlePrompt
-	overflow bool
+	recent   list.List // oldest first; repeated turns keep a chat active
 }
 
 const titlePromptLimit = 4096
 
 func promptDigest(s string) string {
-	sum := sha256.Sum256([]byte(strings.TrimSpace(s)))
-	return hex.EncodeToString(sum[:])
+	return sessions.CodexPromptDigest(strings.TrimSpace(s))
 }
 
 // Inspect only the first real user message, before any assistant reply. A
-// multimodal or unfamiliar title template stays unassociated. GetBytes stops
-// at the selected item, avoiding a copy of the rest of a long conversation.
+// multimodal or unfamiliar title template stays unassociated. Walk the input
+// once; callers do this outside the shared prompt-cache lock.
 func titlePromptDigest(body []byte, title bool) string {
-	for i := 0; i < 32; i++ {
-		item := gjson.GetBytes(body, "input."+strconv.Itoa(i))
-		if !item.Exists() {
-			return ""
+	var digest string
+	i := 0
+	input := gjson.GetBytes(body, "input")
+	if !input.IsArray() {
+		return ""
+	}
+	input.ForEach(func(_, item gjson.Result) bool {
+		i++
+		if i > 32 {
+			return false
 		}
 		if item.Get("role").String() == "assistant" {
-			return ""
+			return false
 		}
 		if item.Get("role").String() != "user" {
-			continue
+			return true
 		}
 		content := item.Get("content")
 		text := ""
@@ -70,31 +73,32 @@ func titlePromptDigest(body []byte, title bool) string {
 				return true
 			})
 			if !valid {
-				return ""
+				return false
 			}
 		}
 		text = strings.TrimSpace(text)
 		if strings.HasPrefix(text, "<environment_context>") || strings.HasPrefix(text, "<user_instructions>") || strings.HasPrefix(text, "# AGENTS.md instructions for ") || strings.HasPrefix(text, "<external_codex_apps_open_page>") {
-			continue
+			return true
 		}
 		if title {
 			const prefix = "You are a helpful assistant. You will be presented with a user prompt,"
 			const marker = "\n\nUser prompt:\n"
 			if !strings.HasPrefix(text, prefix) {
-				return ""
+				return false
 			}
 			_, tail, ok := strings.Cut(text, marker)
 			if !ok {
-				return ""
+				return false
 			}
 			text = strings.TrimSpace(tail)
 		}
 		if text == "" {
-			return ""
+			return false
 		}
-		return promptDigest(text)
-	}
-	return ""
+		digest = promptDigest(text)
+		return false
+	})
+	return digest
 }
 
 func (p *titlePrompts) observe(r *http.Request, body []byte, m sessionMetadata, kind string, at time.Time) *TitleLink {
@@ -106,6 +110,9 @@ func (p *titlePrompts) observe(r *http.Request, body []byte, m sessionMetadata, 
 		return nil
 	}
 	scope := promptDigest(m.Installation)
+	if scope == "" {
+		return nil
+	}
 	if isTitleKind(kind) {
 		if key := titlePromptDigest(body, true); key != "" {
 			return &TitleLink{Scope: scope, Prompt: key}
@@ -113,27 +120,52 @@ func (p *titlePrompts) observe(r *http.Request, body []byte, m sessionMetadata, 
 		return nil
 	}
 	p.Lock()
-	defer p.Unlock()
 	key := scope + ":" + id
-	if _, seen := p.first[key]; seen {
+	if e := p.first[key]; e != nil {
+		p.recent.MoveToBack(e)
+		p.Unlock()
+		return nil
+	}
+	p.Unlock()
+	link := TitleLink{Scope: scope, Prompt: titlePromptDigest(body, false)}
+	p.Lock()
+	defer p.Unlock()
+	// Another request for this chat may have arrived while its body was parsed.
+	if e := p.first[key]; e != nil {
+		p.recent.MoveToBack(e)
 		return nil
 	}
 	if len(p.first) >= titlePromptLimit {
-		p.overflow = true
-		return nil
+		e := p.recent.Front()
+		old := e.Value.(titlePrompt)
+		delete(p.first, old.Link.Scope+":"+old.Session)
+		promptKey := old.Link.Scope + ":" + old.Link.Prompt
+		candidates := p.byPrompt[promptKey]
+		for i, candidate := range candidates {
+			if candidate.Session == old.Session {
+				candidates = append(candidates[:i], candidates[i+1:]...)
+				break
+			}
+		}
+		if len(candidates) == 0 {
+			delete(p.byPrompt, promptKey)
+		} else {
+			p.byPrompt[promptKey] = candidates
+		}
+		p.recent.Remove(e)
 	}
 	if p.first == nil {
-		p.first = make(map[string]titlePrompt)
+		p.first = make(map[string]*list.Element)
 	}
-	link := TitleLink{Scope: scope, Prompt: titlePromptDigest(body, false)}
-	p.first[key] = titlePrompt{Session: id, Time: at, Link: link}
+	entry := titlePrompt{Session: id, Time: at, Link: link}
+	p.first[key] = p.recent.PushBack(entry)
 	if link.Prompt == "" {
 		return nil
 	}
 	if p.byPrompt == nil {
 		p.byPrompt = make(map[string][]titlePrompt)
 	}
-	p.byPrompt[scope+":"+link.Prompt] = append(p.byPrompt[scope+":"+link.Prompt], p.first[key])
+	p.byPrompt[scope+":"+link.Prompt] = append(p.byPrompt[scope+":"+link.Prompt], entry)
 	return &link
 }
 
@@ -190,10 +222,6 @@ func (s *Server) ResolveTitleParents(rows []Route) []Route {
 		return rows
 	}
 	s.titlePrompts.Lock()
-	if s.titlePrompts.overflow {
-		s.titlePrompts.Unlock()
-		return clearInferredParents(rows)
-	}
 	first := []titlePrompt{}
 	seen := map[string]bool{}
 	for _, r := range rows {
