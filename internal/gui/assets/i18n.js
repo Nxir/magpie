@@ -2469,6 +2469,7 @@ const I18N = {
     "{agent} requested a subagent on {model}.": "{agent} 请求了使用 {model} 的子代理。",
     "Luna Reserve": "Luna 储备",
     "Suggestions": "提示词建议",
+    "Background prompt suggestions": "后台提示词建议",
     "Web search": "联网搜索",
     "magpie ran this web search for {agent}'s {model}, which can't search the web by itself: {searcher} searched, and {model} goes on answering once it has what was found. Not a turn of the conversation.": "magpie 代 {agent} 的 {model} 发起的联网搜索：{model} 无法自行搜索，由 {searcher} 搜索，{model} 拿到结果后继续回答。不属于对话轮次。",
     "magpie ran this web search for a model that can't search the web by itself: {searcher} searched, and that model goes on answering once it has what was found. Not a turn of the conversation.": "magpie 代一个无法自行搜索的模型发起的联网搜索：由 {searcher} 搜索，该模型拿到结果后继续回答。不属于对话轮次。",
