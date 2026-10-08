@@ -68,11 +68,20 @@ local storage. The context preference takes precedence over the original
 Opening a request from Usage's Context tab opens that request's context
 only, without changing the saved preference. Choosing another request or
 reloading restores the preference.
-Incoming requests do not open them and continue updating
-the visible request even while details are open. An open context keeps its
-card, grid and unchanged rows in place as live requests arrive; a prompt
-still being read retains the previous context until its counts arrive.
-On a wide routing card
+Restored preferences do not stop following live requests.
+Manually opening either disclosure holds the displayed request's identity:
+its own progress and final counts continue updating, while newer requests
+enter the list and counters without replacing it. The heading retains its
+time, shows how many newer requests match the list, and offers Back to live.
+Closing both disclosures releases a hold made by expanding details. A
+request deliberately picked from the list (including the newest) stays
+selected until Back to live, a filter excluding it, or a day change.
+Replaying a held request restores that selection afterwards; opening
+details during replay does not pin a replay frame. A gateway restart
+releases live selections before its request IDs can be reused. Incoming
+requests do not open disclosures. An open context keeps its card, grid and
+unchanged rows in place as live requests arrive; a prompt still being read
+retains the previous context until its counts arrive. On a wide routing card
 (1280px or more), the routing stage and request story sit beside each other.
 Context remains below both, pairing its overview with the content list at
 800px or more. Both column pairs use the same split, aligning their

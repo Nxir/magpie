@@ -137,11 +137,32 @@
     try { localStorage.setItem(key, open ? "1" : "0"); } catch {}
     steady(disclosures);
   }
-  storyToggle.onclick = () => { storyOpen = !storyOpen; saveDisclosure("magpie.routingDetails", storyOpen); };
+  // A deliberate expansion holds this request, not its current numbers.
+  // Restored disclosure preferences alone do not stop following the trace.
+  function inspectDetails(open) {
+    if (open && !pinned && !day && !rp && logR) {
+      pinned = routes.get(logR.id) || logR;
+      inspecting = true;
+      stopPlays();
+      cur = pinned;
+      sync(true);
+      renderAll();
+    } else if (!open && inspecting && !storyOpen && !contextOpen && !rp) {
+      inspecting = false;
+      pinned = null;
+      followListed();
+    }
+  }
+  storyToggle.onclick = () => {
+    storyOpen = !storyOpen;
+    saveDisclosure("magpie.routingDetails", storyOpen);
+    steady(() => inspectDetails(storyOpen));
+  };
   ctxToggle.onclick = () => {
     contextOpen = !(contextOpen || !!ctxFor);
     ctxFor = 0;
     saveDisclosure("magpie.routingContext", contextOpen);
+    steady(() => inspectDetails(contextOpen));
     ctxKey = "";
     steady(() => { if (logR) renderCtx(logR); });
   };
@@ -286,7 +307,7 @@
       for (const [cls, fits] of Object.entries(marks)) node.classList.toggle(cls, fits(w));
     });
   }).observe(node);
-  byWidth(box, { min800: (w) => w >= 800, min1280: (w) => w >= 1280 });
+  byWidth(box, { max799: (w) => w < 800, min800: (w) => w >= 800, min1280: (w) => w >= 1280 });
   byWidth(main, { max560: (w) => w <= 560 });
   byWidth(list, { max460: (w) => w <= 460, max560: (w) => w <= 560 });
   byWidth(more, { max520: (w) => w <= 520, min1150: (w) => w >= 1150 });
@@ -902,7 +923,8 @@
   // the request the window was opened on (?req=), from the tray panel
   let wanted = document.body.classList.contains("window") && Number(params.get("req")) || 0;
   let cur = null;           // the route the header and the log tell of: the newest played
-  let pinned = null;        // a past route picked from the strip
+  let pinned = null;        // a request picked, or held while reading details
+  let inspecting = false;  // only a detail expansion releases on closing both
   let rows = new Map();     // id → { li, wire, st, bi, tg, w, rid, up }
   const subs = new Map();   // a group in the group's way down → its heading { li, wire, key, up }
   // A provider's keys serving one model, FOLD_AT or more of them side by
@@ -1461,37 +1483,55 @@
   // the log is drawn again only when what it says changes: it is asked to
   // on every trace update (#308)
   let logR = null, headKey = "", stepsKey = "";
+  const newRequests = el("span", "rt-new-requests");
+  const logActions = el("span", "rt-log-actions");
   function renderLog() {
     const r = logR = pinned || cur;
     log.hidden = !r;
     if (!r) { hideCtx(); return; }
     const on = () => listed().filter((x) => x.id >= logR.id);
-    const head = JSON.stringify([document.documentElement.lang, !!rp, pinned?.id, r.id, r.time, r.done, !!pinned && on().length > 1]);
+    const head = JSON.stringify([document.documentElement.lang, !!rp, pinned?.id, r.id, r.time, !pinned && r.done]);
     if (headKey !== head) {
       headKey = head;
       logHead.replaceChildren(
-        el("span", "", rp || pinned ? t("Request at {time}", { time: clock(r.time) }) : t("Latest request")),
-        el("span", "grow"));
-      if (!rp && r.done) {
-        const usage = el("button", "text", t("View usage"));
+        el("span", "rt-log-title", rp || pinned ? t("Request at {time}", { time: clock(r.time) }) : t("Latest request")),
+        el("span", "grow"), logActions);
+      logActions.replaceChildren();
+      if (!rp && (r.done || pinned)) {
+        const usage = el("button", "text rt-view-usage", t("View usage"));
         usage.onclick = () => window.openUsageRoute(logR);
-        logHead.append(usage);
-        const again = el("button", "text", t("Replay"));
+        logActions.append(usage);
+        const again = el("button", "text rt-replay-one", t("Replay"));
         again.onclick = () => replay([logR], pinned);
-        logHead.append(again);
+        logActions.append(again);
         // and on from it: the requests listed after it, as they came
-        if (pinned && on().length > 1) {
-          const from = el("button", "text", t("Replay from here"));
+        if (pinned) {
+          const from = el("button", "text rt-replay-from", t("Replay from here"));
           from.onclick = () => replay(on(), pinned);
-          logHead.append(from);
+          logActions.append(from);
         }
       }
       if (pinned && !rp) {
         const live = el("button", "text", t("Back to live"));
-        live.onclick = () => { if (day) lookAt(""); else { pinned = null; followListed(); } };
-        logHead.append(live);
+        live.onclick = () => {
+          inspecting = false;
+          if (day) lookAt(""); else { pinned = null; followListed(); }
+        };
+        logActions.append(newRequests, live);
       }
     }
+    const newer = pinned && !day && !rp ? listed().filter((x) => x.id > pinned.id).length : 0;
+    newRequests.hidden = !pinned || !!day || !!rp;
+    setText(newRequests, !newer ? t("Viewing request") : newer === 1 ? t("1 new request") : t("{n} new requests", { n: newer }));
+    newRequests.title = t("Newer requests in this list");
+    // Keep the held toolbar in place as a running request finishes or new
+    // calls enable replay-from-here; replacing/wrapping it moved the reader.
+    for (const cls of ["rt-view-usage", "rt-replay-one"]) {
+      const button = logHead.querySelector("." + cls);
+      if (button) button.disabled = !r.done;
+    }
+    const from = logHead.querySelector(".rt-replay-from");
+    if (from) from.disabled = !r.done || on().filter((x) => x.done).length < 2;
     disclosures();
     renderBrief(r);
     renderSteps(r);
@@ -1670,12 +1710,13 @@
     }));
   }
 
-  // pick sets the stage to a past request, or back to live with the newest.
+  // pick holds the stage on the request deliberately chosen, even the newest.
   // The page stays where it is: a request clicked in the list stays under
   // the pointer, and the stage and its story change above it (it used to
   // go up to the stage, which read as the page jumping to its top)
   function pick(r) {
-    pinned = !day && r.id === newest()?.id ? null : r;
+    pinned = r;
+    inspecting = false;
     if (rp) { rp = null; rbar.hidden = true; }
     stopPlays();
     cur = r;
@@ -1835,7 +1876,10 @@
   function followListed() {
     if (rp) endReplay(true);
     stopPlays();
-    if (pinned && !listed().some((r) => r.id === pinned.id)) pinned = null;
+    if (pinned && !listed().some((r) => r.id === pinned.id)) {
+      pinned = null;
+      inspecting = false;
+    }
     cur = pinned || newest();
     if (day) pinned = cur;
     capQ = [];
@@ -1863,6 +1907,7 @@
     past = [];
     if (d) await loadDays(d);
     pinned = null;
+    inspecting = false;
     followListed();
   }
   function renderDays() {
@@ -2567,8 +2612,10 @@
     const speed = rp?.speed || 1;
     rp = null; // the old one, if one was playing, stops here
     stopPlays();
+    const held = inspecting;
     pinned = null;
-    rp = { routes: new Map(), plan, ts, vs, v: -LEAD, total: v, speed, back: back || null, t: performance.now(), real: ts[0] - LEAD };
+    inspecting = false;
+    rp = { routes: new Map(), plan, ts, vs, v: -LEAD, total: v, speed, back: back || null, inspecting: held, t: performance.now(), real: ts[0] - LEAD };
     rTrack.replaceChildren(rHead, ...plan.map((g) => {
       const m = el("i", "rp-mark");
       m.style.left = (g.s / (v || 1)) * 100 + "%";
@@ -2683,8 +2730,9 @@
     rbar.hidden = true;
     if (stop) stopPlays();
     const b = p.back && (routes.get(p.back.id) || (day && past.find((x) => x.id === p.back.id)));
-    pinned = b || null;
-    cur = b || newest();
+    inspecting = !!b && p.inspecting && (storyOpen || contextOpen);
+    pinned = b && (!p.inspecting || inspecting) ? b : null;
+    cur = pinned || newest();
     if (cur) { sync(true); renderAll(); }
     else empty();
   }
@@ -2851,7 +2899,11 @@
           await new Promise((r) => setTimeout(r, 5000));
           continue;
         }
-        if (d.seq < seq) routes.clear(); // the gateway started over
+        if (d.seq < seq) {
+          routes.clear(); // the gateway started over: ids may be reused
+          if (!day) { pinned = null; inspecting = false; }
+          stopPlays();
+        }
         seq = d.seq;
         const first = !loaded;
         const fresh = [];
@@ -2873,14 +2925,18 @@
           // the window opened from the tray panel's Routing tab on a request
           const asked = wanted && routes.get(wanted), r = pinned || asked || newest();
           if (wanted) { wanted = 0; params.delete("req"); history.replaceState(null, "", params.size ? "?" + params : location.pathname); }
-          if (asked && asked.id !== newest().id) pinned = asked;
+          if (asked) pinned = asked;
           if (r) { cur = r; sync(true); say(affWhy(r, true) || ruleWhy(r, true) || firstWhy(r)); renderAll(); } else empty();
           // the page's first frame came before the trace did, and found
           // nothing to fly: the requests under way fly now, not never
           if (seen && shown()) for (const u of underWay()) if (!playing.has(u.id)) play(u.id);
         } else {
           if (cur && routes.has(cur.id) && !rp) cur = routes.get(cur.id);
-          if (pinned && routes.has(pinned.id)) pinned = routes.get(pinned.id);
+          if (pinned && !day && routes.has(pinned.id)) {
+            pinned = routes.get(pinned.id);
+            cur = pinned;
+            sync();
+          }
           if (!pinned && !rp) {
             cur = newest();
             if (cur) sync();
