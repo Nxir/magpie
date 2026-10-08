@@ -196,7 +196,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
       const page = await browser.newPage({ viewport: { width: 1100, height: 800 }, reducedMotion: "reduce" });
       page.setDefaultTimeout(5000);
-      const errors = [], feed = {};
+      // The title endpoint is authoritative, including title removals. Keep
+      // its response consistent with the trace titles this fixture asserts.
+      const errors = [], feed = { names: { "named-suggestions": "Named suggestions", "named-chat": "Chat title" } };
       const fixture = [
         { ...req(1, "codex", "suggestions-a", 0.01), kind: "ambient_suggestion_safety" },
         { ...req(2, "codex", "suggestions-a", 0.02), kind: "ambient_suggestions" },
