@@ -1485,6 +1485,9 @@
   let logR = null, headKey = "", stepsKey = "";
   const newRequests = el("span", "rt-new-requests");
   const logActions = el("span", "rt-log-actions");
+  // Held/live controls can wrap differently. Anchor their persistent
+  // heading when clicked, so returning live cannot scroll to a moved row.
+  logActions.dataset.unrolls = "";
   function renderLog() {
     const r = logR = pinned || cur;
     log.hidden = !r;
