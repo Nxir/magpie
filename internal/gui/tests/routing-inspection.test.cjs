@@ -68,8 +68,9 @@ async function click(page, target) {
   await page.waitForTimeout(100);
   await target.click();
 }
-const selected = (page, id) => page.waitForFunction((id) => document.querySelector('.rt-brief-path')?.textContent.includes('model-' + id)
-  && document.querySelector('.rt-req[aria-pressed="true"]')?.textContent.includes('model-' + id), id);
+// Compare the full model: model-1 after a restart must not match model-103.
+const selected = (page, id) => page.waitForFunction((id) => document.querySelector('.rt-brief-path code')?.textContent === 'codex/model-' + id
+  && document.querySelector('.rt-req[aria-pressed="true"] .asked .m')?.textContent === 'codex/model-' + id, id);
 const back = (page, lang) => page.locator('.rt-log-head button', { hasText: { en: 'Back to live', zh: '回到实时', 'zh-TW': '回到即時', ja: 'ライブに戻る', de: 'Zurück zu live' }[lang] });
 for (const engine of process.env.BROWSER ? [process.env.BROWSER] : ['chromium', 'webkit']) {
   for (const lang of ['en', 'zh', 'zh-TW', 'ja', 'de']) {
