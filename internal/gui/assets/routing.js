@@ -187,10 +187,10 @@
       steady(renderHist);
     }, "Metrics to show", "rt-metric-menu", "right", true);
   };
-  let purpose = "";
+  let purpose = [];
   purposeClear.onclick = () => {
     closeProtoMenu();
-    purpose = "";
+    purpose = [];
     steady(followListed);
     purposePick.focus({ preventScroll: true });
   };
@@ -1413,7 +1413,7 @@
       await loadDays(day);
       if (!past.some((x) => x.id === id)) past.push(r);
     }
-    if (purpose && purposeOf(r.kind) !== purpose) purpose = "";
+    if (!matchesPurpose(r)) purpose = [];
     offline("");
     window.show("routing");
     pick(r);
@@ -1518,13 +1518,13 @@
   // listed: the requests the list shows, newest first — the gateway's last
   // few, or a day the history keeps
   const allListed = () => (day ? past : [...routes.values()]).slice().sort((a, b) => b.id - a.id);
-  const matchesPurpose = (r) => !purpose || purposeOf(r.kind) === purpose;
+  const matchesPurpose = (r) => !purpose.length || purpose.includes(purposeOf(r.kind));
   const listed = () => allListed().filter(matchesPurpose);
   // Match the rows and story: a broken-off 200 fails, an informational note
   // on an answered request (such as Codex titles being off) does not.
   const failedRoute = (r) => r.done && outcome(r)[1] === "bad";
   function renderStats(rs) {
-    const scoped = !!(day || purpose), done = rs.filter((r) => r.done);
+    const scoped = !!(day || purpose.length), done = rs.filter((r) => r.done);
     const counts = scoped ? {
       requests: done.length,
       rerouted: done.reduce((n, r) => n + r.tries.filter((tr, i) => tr.rest && i < r.tries.length - 1).length, 0),
@@ -1727,31 +1727,30 @@
     const rs = listed();
     renderStats(rs);
     const all = allListed();
-    hist.hidden = !all.length && !day && !days.length && !purpose;
-    const opts = purposeOptions(all.map((r) => purposeOf(r.kind)), purpose);
-    const selected = opts.find((o) => o.v === purpose);
-    purposeTools.hidden = opts.length < 2 && !purpose;
-    purposeTools.classList.toggle("set", !!purpose);
-    purposeClear.hidden = !purpose;
+    hist.hidden = !all.length && !day && !days.length && !purpose.length;
+    const opts = purposeOptions([...all.map((r) => purposeOf(r.kind)), ...purpose]);
+    const selected = opts.filter((o) => purpose.includes(o.v));
+    purposeTools.hidden = opts.length < 2 && !purpose.length;
+    purposeTools.classList.toggle("set", !!purpose.length);
+    purposeClear.hidden = !purpose.length;
     purposeClear.title = t("Clear filter");
     purposeClear.setAttribute("aria-label", t("Clear filter"));
-    const label = purpose ? t("Purpose: {name}", { name: selected?.name || purpose }) : t("Purpose filter");
+    const label = purpose.length ? t("Purpose: {name}", { name: selected.map((o) => o.name).join(", ") }) : t("Purpose filter");
     setText(purposeLabel, label);
     purposePick.setAttribute("aria-label", label);
-    purposePick.title = t("Filter routing by purpose") + (purpose ? "\n" + label : "");
+    purposePick.title = t("Filter routing by purpose") + (purpose.length ? "\n" + label : "");
     setText(metricLabel, t("Metrics"));
     metricPick.title = t("Metrics to show");
     purposePick.onclick = (e) => {
       e.stopPropagation();
       if (purposePick.classList.contains("open")) return closeProtoMenu();
-      // A handful of purposes needs a small menu; explanations stay in tooltips.
+      // Tick several purposes without closing the menu; an empty list shows all.
       openProtoMenu(purposePick, [{ v: "", name: t("All purposes"), note: "" }, ...opts].map((o) => ({
         ...o, literalName: true, title: o.note || o.v, note: "",
-      })), purpose, (v) => {
-        purpose = v;
+      })), purpose, (keys) => {
+        purpose = keys;
         steady(followListed);
-        purposePick.focus({ preventScroll: true });
-      }, "Purpose", "rt-purpose-menu", "right");
+      }, "Purpose", "rt-purpose-menu", "right", true);
     };
     setText(reqLabel, t("Requests"));
     setText(replayAll, t("Replay them all"));
@@ -1775,7 +1774,7 @@
     hist.classList.toggle("solo", none);
     if (none) {
       const p = el("div", "empty-state");
-      p.append(el("b", "", purpose ? t("No requests match these filters.") : day ? t("Nothing on {day}", { day: dayName(day) }) : t("No requests since magpie started")),
+      p.append(el("b", "", purpose.length ? t("No requests match these filters.") : day ? t("Nothing on {day}", { day: dayName(day) }) : t("No requests since magpie started")),
         t("Each request an agent sends through magpie shows up here: who answered it, why, and each try."));
       if (!day && days.length) p.append(" " + t("Earlier ones are kept by day, in the bar above."));
       reqs.replaceChildren(p);
@@ -2413,7 +2412,7 @@
 
   function empty() {
     offline("");
-    what.replaceChildren(el("b", "", t(purpose || day ? "No requests match these filters." : "Waiting for a request")));
+    what.replaceChildren(el("b", "", t(purpose.length || day ? "No requests match these filters." : "Waiting for a request")));
     mode.textContent = t("Send one from any agent routed through magpie and it plays here as it happens: who routing put first and why, each try, and what each answered.");
     for (const a of agents.values()) a.wire.remove();
     agents.clear();
@@ -2428,7 +2427,7 @@
     subs.clear();
     chip.hidden = true;
     hubText();
-    list.replaceChildren(el("li", "idle", t(purpose || day ? "No requests match these filters." : "No request yet")));
+    list.replaceChildren(el("li", "idle", t(purpose.length || day ? "No requests match these filters." : "No request yet")));
     say(t("Every request an agent sends to magpie shows up here, routed for real."));
     log.hidden = true;
     renderHist(); // none live, but the days the history keeps are still there to look at

@@ -249,6 +249,8 @@ button.rt-session { cursor: pointer; }
 .pop.proto-menu.rt-purpose-menu { width: 190px; max-width: calc(100vw - 16px); background: var(--card); }
 .rt-purpose-menu .pm-head, .rt-purpose-menu .pm-note { display: none; }
 .rt-purpose-menu .pm-item { align-items: center; padding: 7px 8px; }
+.rt-purpose-menu .pm-tick { height: 13px; width: 13px; border: 1px solid var(--line); border-radius: 3px; }
+.rt-purpose-menu .on .pm-tick { border-color: var(--muted); }
 .rt-purpose-menu .pm-name { font-weight: 400; overflow-wrap: anywhere; }
 @container (max-width: 440px) {
   #view-routing .rt-req-head .note { flex: 1 1 100%; order: 1; margin: 2px 0 0; }

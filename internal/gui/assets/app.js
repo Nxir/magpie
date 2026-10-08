@@ -12035,8 +12035,12 @@ function openProtoMenu(anchor, opts, value, choose, head = "Protocol this key sp
   anchor.classList.add("open");
   if (anchor.hasAttribute("aria-expanded")) anchor.setAttribute("aria-expanded", "true");
   const outside = (e) => { if (!box.contains(e.target) && !anchor.contains(e.target)) closeProtoMenu(); };
-  // Scrolling the menu keeps it open; scrolling outside moves its anchor.
-  const scroll = (e) => { if (!box.contains(e.target)) closeProtoMenu(); };
+  // A live pick can shrink the list or wrap its heading and clamp the scroll.
+  // Only the reader's scroll dismisses it; the click guard holds its anchor.
+  const scroll = (e) => {
+    if (box.contains(e.target) || live && performance.now() >= purposeUntil) return;
+    closeProtoMenu();
+  };
   const keys = (e) => {
     const shown = filter ? items.filter((b) => !b.hidden) : items;
     const i = shown.indexOf(document.activeElement);
