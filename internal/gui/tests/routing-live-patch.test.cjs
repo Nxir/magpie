@@ -50,7 +50,7 @@ function serve(feed) {
   return async (route) => {
     const url = new URL(route.request().url());
     const json = (data) => route.fulfill({ json: data });
-    if (url.pathname === "/boot.js") return route.fulfill({ contentType: "text/javascript", body: 'window.bootPrefs = {lang:"en",theme:"light",web:true};' });
+    if (url.pathname === "/boot.js") return route.fulfill({ contentType: "text/javascript", body: 'window.bootPrefs = {lang:"en",theme:"light",web:true}; localStorage.setItem("magpie.routingContext","1");' });
     if (url.pathname === "/wails/runtime.js") return route.fulfill({ contentType: "text/javascript", body: "export const Window = {};" });
     if (url.pathname === "/api/state") return json(state);
     if (url.pathname === "/api/gateway/trace") {
@@ -90,7 +90,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         // what is there now, and every layout from here on
         await page.evaluate(() => {
           const box = document.querySelector(".rt-ctx"), grid = box.querySelector(".ctx-waffle");
-          window.__was = { rows: [...document.querySelectorAll(".rt-req")], items: [...box.querySelectorAll(".ctx-row, .ctx-leg")], card: box.querySelector(".ctx-card"), grid, cells: [...grid.children], box: box.offsetHeight, gridH: grid.offsetHeight };
+          window.__was = { rows: [...document.querySelectorAll(".rt-req")], items: [...box.querySelectorAll(".ctx-row, .ctx-leg")], card: box.querySelector(".ctx-body"), grid, cells: [...grid.children], box: box.offsetHeight, gridH: grid.offsetHeight };
           window.__sizes = [];
           window.__ro = new ResizeObserver(() => {
             const g = document.querySelector(".rt-ctx .ctx-waffle");
@@ -131,7 +131,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
             rows: rows.length,
             kept: w.rows.map((r) => rows.includes(r)),
             items: w.items.every((e) => e.isConnected && box.contains(e)),
-            card: box.querySelector(".ctx-card") === w.card,
+            card: box.querySelector(".ctx-body") === w.card,
             grid: grid === w.grid,
             cells: w.cells.every((c, i) => grid.children[i] === c) && grid.children.length === w.cells.length,
             sizes: window.__sizes, box0: w.box, grid0: w.gridH, gridH: grid.offsetHeight,
