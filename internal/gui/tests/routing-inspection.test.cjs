@@ -131,6 +131,19 @@ for (const engine of process.env.BROWSER ? [process.env.BROWSER] : ['chromium', 
     }
   }
   for (const lang of ['en', 'zh']) {
+    test(`${engine} ${lang}: opening retained context holds the request its counts belong to`, async (t) => {
+      const { page, send } = await start(t, engine, lang, 1440);
+      await send([req(101, { done: false, prompt: null, tries: [{ ...req(101).tries[0], done: false, status: 0 }] })]);
+      await selected(page, 101);
+      assert.match(await page.locator('.rt-ctx-toggle').innerText(), /10\.1K/);
+      await page.locator('.rt-ctx-toggle').click();
+      await selected(page, 100);
+      assert.match(await page.locator('.rt-ctx .ctx-crumbs').innerText(), /#100/);
+      await send([req(101), req(102)]);
+      await selected(page, 100);
+      await page.locator('.rt-ctx-toggle').click();
+      await selected(page, 102);
+    });
     test(`${engine} ${lang}: a detail hold respects filtering, replay, history and gateway restart`, async (t) => {
       const { page, send } = await start(t, engine, lang, 1440, [req(100), req(99, { kind: 'thread_title' })]);
       const story = page.locator('.rt-detail-toggle');

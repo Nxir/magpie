@@ -139,9 +139,9 @@
   }
   // A deliberate expansion holds this request, not its current numbers.
   // Restored disclosure preferences alone do not stop following the trace.
-  function inspectDetails(open) {
-    if (open && !pinned && !day && !rp && logR) {
-      pinned = routes.get(logR.id) || logR;
+  function inspectDetails(open, r = logR) {
+    if (open && !pinned && !day && !rp && r) {
+      pinned = routes.get(r.id) || r;
       inspecting = true;
       stopPlays();
       cur = pinned;
@@ -162,7 +162,7 @@
     contextOpen = !(contextOpen || !!ctxFor);
     ctxFor = 0;
     saveDisclosure("magpie.routingContext", contextOpen);
-    steady(() => inspectDetails(contextOpen));
+    steady(() => inspectDetails(contextOpen, ctxRoute || logR));
     ctxKey = "";
     steady(() => { if (logR) renderCtx(logR); });
   };
@@ -1576,13 +1576,14 @@
   }
   // The summary follows requests without constructing the full card until
   // the reader opens it. Both disclosures survive requests and reloads.
-  let ctxKey = "", ctxShown = 0, ctxTab = "all";
+  let ctxKey = "", ctxShown = 0, ctxTab = "all", ctxRoute = null;
   function hideCtx() {
     ctxBox.hidden = true;
     box.classList.remove("has-context");
     ctxKey = "";
     ctxDetail.replaceChildren();
     ctxShown = 0;
+    ctxRoute = null;
   }
   function renderCtx(r) {
     // A Usage context link opens this request only, without changing the
@@ -1596,9 +1597,11 @@
     box.classList.toggle("has-context", !ctxBox.hidden);
     if (ctxBox.hidden) {
       ctxKey = "";
+      ctxRoute = null;
       ctxDetail.replaceChildren();
       return;
     }
+    ctxRoute = r;
     const sk = open ? sessionKey(r) : "";
     const same = (x) => x.prompt && x.agent === r.agent && !x.kind && (sk ? sessionKey(x) === sk : r.conv && x.conv === r.conv);
     const series = open && (sk || r.conv) && !r.kind ? listed().filter(same).sort((a, b) => a.id - b.id)

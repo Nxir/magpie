@@ -73,6 +73,8 @@ Manually opening either disclosure holds the displayed request's identity:
 its own progress and final counts continue updating, while newer requests
 enter the list and counters without replacing it. The heading retains its
 time, shows how many newer requests match the list, and offers Back to live.
+If the next prompt is still being read, opening the retained context holds
+the request those visible counts belong to.
 Closing both disclosures releases a hold made by expanding details. A
 request deliberately picked from the list (including the newest) stays
 selected until Back to live, a filter excluding it, or a day change.
