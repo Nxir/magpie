@@ -61,7 +61,9 @@ using the same counts as `ctxCard` in
 details under the same clickable header; its closed counts disappear from
 the header while open. Closing removes the detail body. Request details
 (including policy) and context keep independent preferences in browser
-local storage. Incoming requests do not open them and continue updating
+local storage. The context preference takes precedence over the original
+`magpie.ctxShut` choice, which is retained when no new preference exists.
+Incoming requests do not open them and continue updating
 the visible request even while details are open. An open context keeps its
 card, grid and unchanged rows in place as live requests arrive; a prompt
 still being read retains the previous context until its counts arrive.

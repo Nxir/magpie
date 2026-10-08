@@ -106,7 +106,9 @@
   let storyOpen = false, contextOpen = false, disclosureKey = "";
   try {
     storyOpen = localStorage.getItem("magpie.routingDetails") === "1";
-    contextOpen = localStorage.getItem("magpie.routingContext") === "1";
+    const contextPref = localStorage.getItem("magpie.routingContext");
+    // Preserve the choice made with the original context-card fold.
+    contextOpen = contextPref !== null ? contextPref === "1" : localStorage.getItem("magpie.ctxShut") === "0";
   } catch {}
   function detailVisibility() {
     preview.setAttribute("aria-hidden", String(!storyOpen && !story.classList.contains("has-events")));
