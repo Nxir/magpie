@@ -17,6 +17,10 @@ engines in all five languages at 2048/1440/1354/1280/900/880/860/420/360px,
 including both sides of the card-width breakpoints.
 `MAGPIE_DETAIL_ASSETS` points it at original assets to verify the
 closed-context assertion fails on an eagerly constructed detail grid.
+`routing-context-fold.test.cjs` and `routing-live-patch.test.cjs` also retain
+the upstream thin occupancy bar, a single fixed-height folded line, its
+nodes across incoming requests, and the one-request expansion reached
+from Usage's Context tab without changing the saved preference.
 
 ```sh
 node --test internal/gui/tests/routing-details.test.cjs

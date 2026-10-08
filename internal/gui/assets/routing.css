@@ -151,7 +151,12 @@
 .rt-ctx-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; padding: 3px 0; background: none; border: 0; border-radius: 4px; color: var(--fg); }
 .rt-ctx-toggle > svg { opacity: .5; }
 .rt-ctx-toggle:hover > svg { opacity: 1; }
-.ctx-summary { flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-width: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.ctx-summary { flex: 1; display: flex; align-items: center; gap: 6px 10px; min-width: 0; height: 20px; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+.ctx-summary .ctx-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ctx-summary-numbers { display: flex; align-items: center; gap: inherit; flex: none; }
+.ctx-summary .ctx-stack { display: flex; }
+.rt:not(.min800) .ctx-summary { gap: 6px; font-size: 11px; }
+.rt:not(.min800) .ctx-summary .ctx-stack { min-width: 12px; }
 .ctx-summary .grow { flex: 1; }
 .ctx-summary .ctx-title { font-size: 12px; }
 .ctx-summary-used { color: var(--muted); white-space: nowrap; }

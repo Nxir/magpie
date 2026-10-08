@@ -103,7 +103,7 @@
   details.append(storyToggle, preview, policy);
   story.append(logHead, brief);
   log.append(story);
-  let storyOpen = false, contextOpen = false, disclosureKey = "";
+  let storyOpen = false, contextOpen = false, ctxFor = 0, disclosureKey = "";
   try {
     storyOpen = localStorage.getItem("magpie.routingDetails") === "1";
     const contextPref = localStorage.getItem("magpie.routingContext");
@@ -115,7 +115,8 @@
     storyToggle.querySelector(".rt-brief-path")?.setAttribute("aria-hidden", String(!storyOpen && !story.classList.contains("has-events")));
   }
   function disclosures() {
-    const key = JSON.stringify([document.documentElement.lang, storyOpen, contextOpen]);
+    const contextShown = contextOpen || !!ctxFor;
+    const key = JSON.stringify([document.documentElement.lang, storyOpen, contextShown]);
     if (key === disclosureKey) return;
     disclosureKey = key;
     story.classList.toggle("expanded", storyOpen);
@@ -129,8 +130,8 @@
     cap.classList.add("rt-announcement");
     policy.hidden = !storyOpen;
     policyTitle.textContent = t("Current routing policy");
-    ctxToggle.setAttribute("aria-expanded", String(contextOpen));
-    ctxDetail.hidden = !contextOpen;
+    ctxToggle.setAttribute("aria-expanded", String(contextShown));
+    ctxDetail.hidden = !contextShown;
   }
   function saveDisclosure(key, open) {
     try { localStorage.setItem(key, open ? "1" : "0"); } catch {}
@@ -138,7 +139,8 @@
   }
   storyToggle.onclick = () => { storyOpen = !storyOpen; saveDisclosure("magpie.routingDetails", storyOpen); };
   ctxToggle.onclick = () => {
-    contextOpen = !contextOpen;
+    contextOpen = !(contextOpen || !!ctxFor);
+    ctxFor = 0;
     saveDisclosure("magpie.routingContext", contextOpen);
     ctxKey = "";
     steady(() => { if (logR) renderCtx(logR); });
@@ -1534,7 +1536,7 @@
   }
   // The summary follows requests without constructing the full card until
   // the reader opens it. Both disclosures survive requests and reloads.
-  let ctxKey = "", ctxShown = 0, ctxTab = "all", ctxFor = 0;
+  let ctxKey = "", ctxShown = 0, ctxTab = "all";
   function hideCtx() {
     ctxBox.hidden = true;
     box.classList.remove("has-context");
@@ -1543,6 +1545,10 @@
     ctxShown = 0;
   }
   function renderCtx(r) {
+    // A Usage context link opens this request only, without changing the
+    // reader's saved preference for the next request or a reload.
+    if (ctxFor && ctxFor !== r.id) { ctxFor = 0; disclosures(); }
+    const open = contextOpen || ctxFor === r.id;
     // Keep the last live context in place while the next prompt is read,
     // including the closed summary. A deliberately picked request is fresh.
     if (!r.prompt && !r.done && !pinned && !ctxBox.hidden && ctxKey) return;
@@ -1553,17 +1559,18 @@
       ctxDetail.replaceChildren();
       return;
     }
-    const sk = contextOpen ? sessionKey(r) : "";
+    const sk = open ? sessionKey(r) : "";
     const same = (x) => x.prompt && x.agent === r.agent && !x.kind && (sk ? sessionKey(x) === sk : r.conv && x.conv === r.conv);
-    const series = contextOpen && (sk || r.conv) && !r.kind ? listed().filter(same).sort((a, b) => a.id - b.id)
+    const series = open && (sk || r.conv) && !r.kind ? listed().filter(same).sort((a, b) => a.id - b.id)
       .map((x) => ({ id: x.id, tokens: x.prompt.tokens, time: x.time })) : null;
     if (series && !series.some((x) => x.id === r.id)) series.push({ id: r.id, tokens: r.prompt.tokens, time: r.time });
     const key = JSON.stringify([document.documentElement.lang, r.id, r.done,
-      contextOpen ? r.prompt : [r.prompt.tokens, r.prompt.counted, r.prompt.window], r.usage, series, contextOpen]);
+      r.prompt, r.usage, series, open]);
     if (key === ctxKey) return;
     ctxKey = key;
-    ctxToggle.replaceChildren(window.ctxSummary(r, contextOpen), svg(CHEV, 12, 1.6));
-    if (!contextOpen) { ctxDetail.replaceChildren(); return; }
+    if (ctxToggle.firstElementChild) window.ctxSummary(r, open, ctxToggle.firstElementChild);
+    else ctxToggle.replaceChildren(window.ctxSummary(r, open), svg(CHEV, 12, 1.6));
+    if (!open) { ctxDetail.replaceChildren(); return; }
     const sess = groupSession(r) || r.conv || "";
     const still = ctxShown === r.id;
     ctxShown = r.id;
@@ -1695,7 +1702,7 @@
     if (!matchesPurpose(r)) purpose = [];
     offline("");
     window.show("routing");
-    if (o.context) ctxFor = r.id;
+    ctxFor = o.context ? r.id : 0;
     pick(r);
   };
 

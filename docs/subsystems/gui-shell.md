@@ -55,7 +55,9 @@ summary; decision prose refers to it as the selected account, while other
 seats and exceptional attempts keep their names.
 
 A request with prompt data shows a closed context summary: used tokens,
-model window, fill, estimation/live state and the final attempt's cache rate,
+model window, fill, estimation/live state, the final attempt's cache rate,
+and the thin bar of prompt parts. The summary and bar are patched in place
+and keep one line's height as live requests arrive,
 using the same counts as `ctxCard` in
 [`context.js`](../../internal/gui/assets/context.js). Opening it builds the
 details under the same clickable header; its closed counts disappear from
@@ -63,6 +65,9 @@ the header while open. Closing removes the detail body. Request details
 (including policy) and context keep independent preferences in browser
 local storage. The context preference takes precedence over the original
 `magpie.ctxShut` choice, which is retained when no new preference exists.
+Opening a request from Usage's Context tab opens that request's context
+only, without changing the saved preference. Choosing another request or
+reloading restores the preference.
 Incoming requests do not open them and continue updating
 the visible request even while details are open. An open context keeps its
 card, grid and unchanged rows in place as live requests arrive; a prompt

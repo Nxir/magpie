@@ -93,28 +93,45 @@
       : "Estimated from what the agent sent: the vendor didn't say how many tokens it read");
     return st;
   }
-  function ctxSummary(r, open = false) {
+  function ctxStack(p) {
+    const window = p.window || 0, bar = el("span", "ctx-stack");
+    bar.setAttribute("role", "img");
+    bar.setAttribute("aria-label", t("{used} of {window} tokens used", { used: fmtK(p.tokens), window: fmtK(window || p.tokens) }));
+    const scale = Math.max(window, p.tokens, 1);
+    for (const k of PARTS) {
+      const n = p.parts.find((x) => x.kind === k)?.tokens || 0;
+      const i = el("i", "k-" + k);
+      i.title = partName(k);
+      i.style.width = +(Math.max(0, n) / scale * 100).toFixed(2) + "%";
+      bar.append(i);
+    }
+    return bar;
+  }
+  function ctxSummary(r, open = false, into = null) {
     const p = r.prompt, window = p.window || 0;
     const summary = el("span", "ctx-summary");
     summary.append(el("span", "ctx-title", t("Context window")));
     if (open) {
       summary.append(el("span", "grow"), ctxState(r));
-      return summary;
+      return into ? morph(into, summary) : summary;
     }
+    const figures = el("span", "ctx-summary-numbers");
+    summary.append(figures);
     const used = el("span", "ctx-summary-used");
     used.append(el("b", "", fmtK(p.tokens)), window ? " / " + fmtK(window) : " " + t("tokens"));
     used.title = t(p.counted ? "Counted" : "Estimated");
-    summary.append(used);
+    figures.append(used);
     if (window) {
       const fill = p.tokens / window, [tone, word] = health(fill);
       const h = el("span", "ctx-health " + tone, pct(fill));
       h.title = t(word) + " · " + t("{tokens} free", { tokens: fmtK(Math.max(0, window - p.tokens)) });
-      summary.append(h);
+      figures.append(h);
     }
-    if (!p.counted || !r.done) summary.append(el("span", "ctx-summary-est", t(!r.done ? "Live" : "Estimated")));
+    if (!p.counted || !r.done) figures.append(el("span", "ctx-summary-est", t(!r.done ? "Live" : "Estimated")));
     const cache = cacheOf(r);
-    if (cache && p.counted !== false) summary.append(el("span", "ctx-summary-cache", t("Cache") + " " + pct(cache.read / cache.total)));
-    return summary;
+    if (cache && p.counted !== false) figures.append(el("span", "ctx-summary-cache", t("Cache") + " " + pct(cache.read / cache.total)));
+    summary.append(ctxStack(p));
+    return into ? morph(into, summary) : summary;
   }
   window.ctxSummary = ctxSummary;
 
@@ -416,18 +433,7 @@
         head.append(el("span", "ctx-short", fmtK(p.tokens) + (window ? " / " + fmtK(window) + " · " + pct(full) : "")));
         // folded, a thin bar of what fills the window, a part each; it is
         // morphed with the head, so a live request moves its widths only
-        const bar = el("span", "ctx-stack");
-        bar.setAttribute("role", "img");
-        bar.setAttribute("aria-label", t("{used} of {window} tokens used", { used: fmtK(p.tokens), window: fmtK(window || p.tokens) }));
-        const scale = Math.max(window, p.tokens, 1);
-        for (const k of PARTS) {
-          const n = p.parts.find((x) => x.kind === k)?.tokens || 0;
-          const i = el("i", "k-" + k);
-          i.title = partName(k);
-          i.style.width = +(Math.max(0, n) / scale * 100).toFixed(2) + "%";
-          bar.append(i);
-        }
-        head.append(bar);
+        head.append(ctxStack(p));
       }
       head.append(el("span", "grow"));
       if (r.model) head.append(el("code", "ctx-model", r.model));

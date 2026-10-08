@@ -157,7 +157,6 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         }
         assert.deepEqual(got.scroll, [], "the page doesn't scroll by itself");
         assert.deepEqual(errors, []);
-        feed.next?.(req(999, "done"));
         await context.close();
       });
       await t.test(`${width}x${height}, folded`, async () => {
@@ -171,11 +170,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await page.route("**/*", serve(feed));
         await page.goto("http://magpie.test/?view=routing");
         await page.locator(".rt-req").nth(first.length - 1).waitFor();
-        await page.locator(".rt-ctx .ctx-card.shut").waitFor();
+        await page.locator('.rt-ctx-toggle[aria-expanded="false"]').waitFor();
         await page.waitForTimeout(600);
         await page.evaluate(() => {
           const box = document.querySelector(".rt-ctx");
-          window.__was = { rows: [...document.querySelectorAll(".rt-req")], line: box.querySelector(".ctx-card"), head: box.querySelector(".ctx-head"), bar: box.querySelector(".ctx-stack"), h: box.offsetHeight, list: document.querySelector(".rt-reqs").getBoundingClientRect().top };
+          window.__was = { rows: [...document.querySelectorAll(".rt-req")], line: box.querySelector(".ctx-summary"), head: box.querySelector(".ctx-head"), bar: box.querySelector(".ctx-stack"), h: box.offsetHeight, list: document.querySelector(".rt-reqs").getBoundingClientRect().top };
           window.__sizes = [];
           window.__ro = new ResizeObserver(() => window.__sizes.push(box.offsetHeight));
           window.__ro.observe(box);
@@ -193,7 +192,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
             await page.waitForTimeout(400);
             said.push(await page.evaluate(() => {
               const box = document.querySelector(".rt-ctx");
-              return box.querySelector(".ctx-short").textContent + " " + box.querySelector(".ctx-crumbs").textContent.split(" › ").pop()
+              return box.querySelector(".ctx-summary-used").textContent + " · " + box.querySelector(".ctx-health").textContent
                 + " " + [...box.querySelectorAll(".ctx-stack > i")].map((i) => i.style.width).join(",");
             }));
           }
@@ -201,16 +200,16 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         // the folded head waits for a prompt in its place, then tells of it
         const bar = (f, r, c) => `3.31%,4.41%,0%,${f}%,${r}%,${c}%`;
         assert.deepEqual(said, [
-          "114K / 272K · 42% #103 " + bar(15.44, 9.56, 9.19),
-          ...Array(3).fill("122K / 272K · 45% #104 " + bar(16.91, 10.29, 9.93)),
-          ...Array(2).fill("130K / 272K · 48% #105 " + bar(18.38, 11.03, 10.66)),
+          "114K / 272K · 42% " + bar(15.44, 9.56, 9.19),
+          ...Array(3).fill("122K / 272K · 45% " + bar(16.91, 10.29, 9.93)),
+          ...Array(2).fill("130K / 272K · 48% " + bar(18.38, 11.03, 10.66)),
         ]);
         const got = await page.evaluate(() => {
           window.__ro.disconnect();
           const box = document.querySelector(".rt-ctx"), w = window.__was, rows = [...document.querySelectorAll(".rt-req")];
           return {
-            kept: w.rows.every((r) => rows.includes(r)), line: box.querySelector(".ctx-card") === w.line && box.querySelector(".ctx-head") === w.head, bar: box.querySelector(".ctx-stack") === w.bar,
-            card: !box.querySelector(".ctx-card").classList.contains("shut") || box.querySelector(".ctx-waffle").getClientRects().length > 0, h: box.offsetHeight, h0: w.h, sizes: window.__sizes, scroll: window.__scroll,
+            kept: w.rows.every((r) => rows.includes(r)), line: box.querySelector(".ctx-summary") === w.line && box.querySelector(".ctx-head") === w.head, bar: box.querySelector(".ctx-stack") === w.bar,
+            card: box.querySelector(".rt-ctx-toggle").getAttribute("aria-expanded") !== "false" || !!box.querySelector(".ctx-waffle"), h: box.offsetHeight, h0: w.h, sizes: window.__sizes, scroll: window.__scroll,
             list: document.querySelector(".rt-reqs").getBoundingClientRect().top, list0: w.list,
           };
         });
@@ -221,7 +220,6 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.equal(got.list, got.list0, "the request list stays where it was");
         assert.deepEqual(got.scroll, [], "the page doesn't scroll by itself");
         assert.deepEqual(errors, []);
-        feed.next?.(req(999, "done"));
         await context.close();
       });
     }
