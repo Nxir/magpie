@@ -2907,7 +2907,7 @@
         }
         if (d.seq < seq) {
           routes.clear(); // the gateway started over: ids may be reused
-          if (!day) { pinned = null; inspecting = false; }
+          if (!day) { pinned = null; inspecting = false; ctxFor = 0; }
           if (rp && !day) { rp.back = null; rp.inspecting = false; }
           stopPlays();
         }

@@ -36,7 +36,9 @@ closing both releases an automatic hold. Back to live and restored preferences
 follow new requests even with details open. Deliberately selecting the newest
 request stays selected independently of disclosure state. Both engines run
 all five languages at 1440 and 420px, with filtering, historical ID collisions,
-replay return and gateway restarts checked in English and Chinese.
+replay return and gateway restarts checked in English and Chinese. Usage's
+Context links open and hold only their request without changing the saved
+fold choice; a gateway restart also clears that one-request expansion.
 `ASSET_DIR` can point at the prior assets: a new request replaces the opened
 request, failing the held identity assertion.
 

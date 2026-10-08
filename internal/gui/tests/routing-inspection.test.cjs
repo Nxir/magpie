@@ -135,6 +135,34 @@ for (const engine of process.env.BROWSER ? [process.env.BROWSER] : ['chromium', 
     }
   }
   for (const lang of ['en', 'zh']) {
+    test(`${engine} ${lang}: a Usage context link opens and holds only its request`, async (t) => {
+      const { page, send } = await start(t, engine, lang, 1440);
+      const context = page.locator('.rt-ctx-toggle');
+      await page.evaluate((r) => window.openRoute(r.id, r.time, { context: true }), req(100));
+      await page.locator('.rt-ctx .ctx-waffle').waitFor();
+      assert.equal(await context.getAttribute('aria-expanded'), 'true');
+      assert.equal(await page.evaluate(() => localStorage.getItem('magpie.routingContext')), null, 'the link does not change the saved fold choice');
+      await send([req(101)]);
+      await selected(page, 100);
+      assert.match(await page.locator('.rt-ctx .ctx-crumbs').innerText(), /#100/);
+      await context.click();
+      await send([req(102)]);
+      await selected(page, 100);
+      assert.equal(await context.getAttribute('aria-expanded'), 'false', 'closing the context keeps an explicit selection');
+      await click(page, back(page, lang));
+      await selected(page, 102);
+      assert.equal(await context.getAttribute('aria-expanded'), 'false');
+      // Reusing the same ID after a gateway restart cannot inherit a
+      // one-request expansion opened from the previous run's Usage link.
+      await send([req(1)], 1, 1);
+      await selected(page, 1);
+      await page.evaluate((r) => window.openRoute(r.id, r.time, { context: true }), req(1));
+      await page.locator('.rt-ctx .ctx-waffle').waitFor();
+      await send([req(1, { model: 'codex/reused-context-id' })], 1, 0);
+      await page.waitForFunction(() => document.querySelector('.rt-brief-path code')?.textContent === 'codex/reused-context-id');
+      assert.equal(await context.getAttribute('aria-expanded'), 'false', 'a restart releases the one-request expansion as well as the hold');
+      assert.equal(await back(page, lang).count(), 0);
+    });
     test(`${engine} ${lang}: opening retained context holds the request its counts belong to`, async (t) => {
       const { page, send } = await start(t, engine, lang, 1440);
       await send([req(101, { done: false, prompt: null, tries: [{ ...req(101).tries[0], done: false, status: 0 }] })]);

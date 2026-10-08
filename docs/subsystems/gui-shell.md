@@ -80,7 +80,8 @@ request deliberately picked from the list (including the newest) stays
 selected until Back to live, a filter excluding it, or a day change.
 Replaying a held request restores that selection afterwards; opening
 details during replay does not pin a replay frame. A gateway restart
-releases live selections before its request IDs can be reused. Incoming
+releases live selections and one-request context expansions before its
+request IDs can be reused. Incoming
 requests do not open disclosures. An open context keeps its card, grid and
 unchanged rows in place as live requests arrive; a prompt still being read
 retains the previous context until its counts arrive. On a wide routing card
