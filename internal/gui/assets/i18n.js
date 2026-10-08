@@ -4,6 +4,14 @@
 // works. {name} slots are filled by t(str, vars).
 const I18N = {
   zh: {
+    "Selected account": "所选账号",
+    "Only one account is enabled for this model.": "此模型只启用了一个账号。",
+    "Current routing policy": "当前路由策略说明",
+    "Show details": "展开详情",
+    "Hide details": "收起详情",
+    "Request at {time}": "{time} 的请求",
+    "In progress": "进行中",
+    "Answered": "已回答",
     // the context window (context.js)
     "1 request": "1 个请求",
     "1 session": "1 个会话",
@@ -3794,6 +3802,14 @@ const I18N = {
     "credits": "积分",
   },
   "zh-TW": {
+    "Selected account": "所選帳號",
+    "Only one account is enabled for this model.": "此模型只啟用了一個帳號。",
+    "Current routing policy": "目前路由策略說明",
+    "Show details": "展開詳情",
+    "Hide details": "收起詳情",
+    "Request at {time}": "{time} 的請求",
+    "In progress": "進行中",
+    "Answered": "已回應",
     "magpie's key": "magpie 的金鑰",
     "Claude Code sends magpie its key and is signed out of claude.ai while it runs through magpie: claude.ai's plan limits in /usage, its connectors, voice and /teleport are off": "Claude Code 向 magpie 傳送 magpie 的金鑰，經 magpie 執行期間處於 claude.ai 未登入狀態：/usage 裡的方案限額、claude.ai 連接器、語音和 /teleport 都無法使用",
     "Claude Code keeps its claude.ai sign-in (/login), so those work; it sends that sign-in to magpie, which never passes it on. Remote Control and ultrareview stay off: Claude Code has them only on Anthropic's own address": "Claude Code 保留 claude.ai 登入（/login），上述功能可用；它把這份登入憑證傳給 magpie，magpie 不會轉交到任何地方。Remote Control 和 ultrareview 仍無法使用：Claude Code 只在 Anthropic 官方位址上提供它們",
@@ -7567,6 +7583,14 @@ const I18N = {
     "credits": "積分",
   },
   ja: {
+    "Selected account": "選択したアカウント",
+    "Only one account is enabled for this model.": "このモデルで有効なアカウントは1つだけです。",
+    "Current routing policy": "現在のルーティング方針",
+    "Show details": "詳細を表示",
+    "Hide details": "詳細を閉じる",
+    "Request at {time}": "{time} のリクエスト",
+    "In progress": "処理中",
+    "Answered": "応答済み",
     // the context window (context.js)
     "1 request": "1 件のリクエスト",
     "1 session": "1 件のセッション",
@@ -11342,6 +11366,14 @@ const I18N = {
     "Main navigation": "メインナビゲーション",
   },
   de: {
+    "Selected account": "Gewähltes Konto",
+    "Only one account is enabled for this model.": "Für dieses Modell ist nur ein Konto aktiviert.",
+    "Current routing policy": "Aktuelle Routing-Strategie",
+    "Show details": "Details anzeigen",
+    "Hide details": "Details ausblenden",
+    "Request at {time}": "Anfrage um {time}",
+    "In progress": "In Bearbeitung",
+    "Answered": "Beantwortet",
     // the context window (context.js)
     "1 request": "1 Anfrage",
     "1 session": "1 Sitzung",
