@@ -103,7 +103,8 @@ filters and CSV export, route navigation, session grouping, historical days
 and the narrow layout. Routing also covers keyboard dismissal and clearing
 the purpose while keeping the selected day and session grouping. Checkbox
 selection also covers combining purposes, immediate updates without closing
-or scrolling, keyboard toggling, restoring all purposes, and retaining the
+or scrolling, keyboard toggling, restoring all purposes and returning focus
+to the purpose button when All purposes closes the menu, and retaining the
 union through history, session grouping and matching route navigation, in
 English, Simplified/Traditional Chinese, Japanese and German at narrow widths. It uses
 isolated API fixtures. Run with

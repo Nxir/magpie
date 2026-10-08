@@ -37,6 +37,9 @@ requests matching any selected purpose, with the menu kept open. An empty
 selection, All purposes or Clear filter restores every purpose without
 changing the day or request/session view. A live menu stays open when its
 redraw clamps the list's scroll; the reader scrolling outside still dismisses it.
+Choosing All purposes closes the menu and returns keyboard focus to the
+purpose button without scrolling; unticking the last checkbox keeps the
+menu open and focused on that checkbox.
 Counts, the current story and replay
 follow the same filtered list. Selected purposes remain available when a day
 has no matching requests. Opening a request from another page clears the

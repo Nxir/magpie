@@ -1750,6 +1750,7 @@
       })), purpose, (keys) => {
         purpose = keys;
         steady(followListed);
+        if (!purpose.length) purposePick.focus({ preventScroll: true });
       }, "Purpose", "rt-purpose-menu", "right", true);
     };
     setText(reqLabel, t("Requests"));
