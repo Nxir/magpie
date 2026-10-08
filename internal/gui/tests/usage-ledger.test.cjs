@@ -425,6 +425,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         const live = page.locator(".rt-log-head").getByText(lang === "en" ? "Back to live" : "回到实时", {exact:true});
         assert.equal(await live.count(), 1, "the requested route is an explicit selection, including the newest");
         await live.click();
+        await live.waitFor({ state: "detached" });
         assert.equal(await live.count(), 0, "returning live releases that selection");
         assert.deepEqual(errors, []);
         await page.close();

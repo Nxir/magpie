@@ -42,7 +42,7 @@ async function start(t, engine, lang, width, initial = [req(100)]) {
   const feed = { initial, seq: 100, total: 1 }, errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.route('**/*', serve(lang, feed));
-  t.after(async () => { feed.next?.([]); await browser.close(); assert.deepEqual(errors, []); });
+  t.after(async () => { await browser.close(); assert.deepEqual(errors, []); });
   const send = async (rs, total = feed.total + 1, seq = feed.seq + 1) => {
     for (let i = 0; i < 150 && !feed.next; i++) await page.waitForTimeout(20);
     assert.ok(feed.next, 'the trace poll is waiting');
@@ -76,7 +76,7 @@ for (const engine of process.env.BROWSER ? [process.env.BROWSER] : ['chromium', 
     for (const width of [1440, 420]) {
       test(`${engine} ${lang} ${width}px: expanding details holds one request without freezing its progress`, async (t) => {
         const running = req(100, { done: false, prompt: { ...req(100).prompt, counted: false }, tries: [{ ...req(100).tries[0], done: false, status: 0 }] });
-        const { page, send } = await start(t, engine, lang, width, [running]);
+        const { page, send, feed } = await start(t, engine, lang, width, [running]);
         const story = page.locator('.rt-detail-toggle'), context = page.locator('.rt-ctx-toggle');
         await context.click();
         await selected(page, 100);
@@ -112,6 +112,9 @@ for (const engine of process.env.BROWSER ? [process.env.BROWSER] : ['chromium', 
         await context.click();
         await send([req(106)]);
         await selected(page, 105);
+        // Reload cancels the previous page's poll. Do not send the next
+        // trace to its stale resolver before the new page starts polling.
+        feed.next = null;
         await page.reload();
         await page.locator('.rt-ctx .ctx-waffle').waitFor();
         assert.equal(await back(page, lang).count(), 0, 'restored preferences do not create a hold');
