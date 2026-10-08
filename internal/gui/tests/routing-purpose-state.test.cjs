@@ -155,6 +155,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const pending = req(108, "thread_title");
       pending.done = pending.tries[0].done = false;
       await send([pending]);
+      await story(107);
+      await click(page, page.locator(".rt-log-head button", { hasText: lang === "zh" ? "回到实时" : "Back to live" }));
       await story(108);
       const beforeDone = await counts();
       await send([req(108, "thread_title")]);
