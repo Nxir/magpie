@@ -62,7 +62,10 @@ details under the same clickable header; its closed counts disappear from
 the header while open. Closing removes the detail body. Request details
 (including policy) and context keep independent preferences in browser
 local storage. Incoming requests do not open them and continue updating
-the visible request even while details are open. On a wide routing card
+the visible request even while details are open. An open context keeps its
+card, grid and unchanged rows in place as live requests arrive; a prompt
+still being read retains the previous context until its counts arrive.
+On a wide routing card
 (1280px or more), the routing stage and request story sit beside each other.
 Context remains below both, pairing its overview with the content list at
 800px or more. Both column pairs use the same split, aligning their
