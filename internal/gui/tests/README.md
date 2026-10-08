@@ -12,7 +12,8 @@ the request path, a faded path preview with decision reasons hidden,
 aligned result/explanation dots, an inline whole-row disclosure with mouse
 and keyboard controls, stable width as details open, reachable field hints,
 the translated current-policy label, and policy at the bottom of the
-same disclosure. Incoming requests still update an opened story. It runs both
+same disclosure. Incoming calls leave a deliberately opened request in place;
+returning live follows them with the same disclosure preferences. It runs both
 engines in all five languages at 2048/1440/1354/1280/900/880/860/420/360px,
 including both sides of the card-width breakpoints.
 `MAGPIE_DETAIL_ASSETS` points it at original assets to verify the
@@ -24,6 +25,25 @@ from Usage's Context tab without changing the saved preference.
 
 ```sh
 node --test internal/gui/tests/routing-details.test.cjs
+```
+
+## Routing inspection hold
+
+`routing-inspection.test.cjs` checks that manually opening request or context
+details holds that request while its completion, prompt counts, request list
+and totals keep updating. Closing only one disclosure retains the hold;
+closing both releases an automatic hold. Back to live and restored preferences
+follow new requests even with details open. Deliberately selecting the newest
+request stays selected independently of disclosure state. Both engines run
+all five languages at 1440 and 420px, with filtering, historical ID collisions,
+replay return and gateway restarts checked in English and Chinese. Usage's
+Context links open and hold only their request without changing the saved
+fold choice; a gateway restart also clears that one-request expansion.
+`ASSET_DIR` can point at the prior assets: a new request replaces the opened
+request, failing the held identity assertion.
+
+```sh
+node --test internal/gui/tests/routing-inspection.test.cjs
 ```
 
 ## Installed desktop fonts

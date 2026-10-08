@@ -112,6 +112,13 @@
 .rt-log-head { display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--fg); }
 .rt-log-head .grow { flex: 1; }
 .rt-log-head { flex-wrap: wrap; gap: 4px 8px; }
+.rt-new-requests { min-width: 12em; color: var(--muted); font-size: 11px; font-weight: 400; white-space: nowrap; }
+.rt-log-title { white-space: nowrap; }
+.rt-log-actions { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; overflow-x: auto; }
+.rt-log-actions > * { flex: none; }
+.rt-log-actions button:disabled { color: var(--faint); }
+.rt:not(.min800) .rt-log-title { flex-basis: 100%; }
+.rt:not(.min800) .rt-log-actions { flex: 1 1 100%; overflow-x: scroll; }
 .rt-main { min-width: 0; }
 .rt > .rt-ctx { margin-top: 12px; }
 .rt-story, .rt-ctx { min-width: 0; }

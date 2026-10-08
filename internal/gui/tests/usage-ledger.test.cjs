@@ -408,11 +408,13 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.deepEqual(errors, []);
         await page.close();
       });
-      await t.test(lang + ": newest live route needs no return-to-live button", async () => {
+      await t.test(lang + ": opening even the newest live route holds it until Back to live", async () => {
         const asked = [];
         const { page, errors } = await open(lang, "light", asked);
         await page.route("**/api/gateway/trace?*", async route => {
-          await page.waitForTimeout(100);
+          // A held trace may finish after the page closes. Its fake server
+          // delay must not depend on a still-open browser page.
+          await new Promise((resolve) => setTimeout(resolve, 100));
           await route.fulfill({json:{mine:true, seq:1, routes:[{id:123,time:ROWS[0].t,agent:"codex",model:"gpt-6-sol",provider:"relay",order:[],tries:[],done:true,status:200}],totals:{requests:1,rerouted:0,errors:0},now:new Date().toISOString()}}).catch(()=>{});
         });
         await page.waitForTimeout(5500);
@@ -420,7 +422,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await wheelTo(page, link);
         await link.click();
         await page.locator("#view-routing").waitFor({state:"visible"});
-        assert.equal(await page.locator(".rt-log-head").getByText(lang === "en" ? "Back to live" : "回到实时", {exact:true}).count(), 0);
+        const live = page.locator(".rt-log-head").getByText(lang === "en" ? "Back to live" : "回到实时", {exact:true});
+        assert.equal(await live.count(), 1, "the requested route is an explicit selection, including the newest");
+        await live.click();
+        await live.waitFor({ state: "detached" });
+        assert.equal(await live.count(), 0, "returning live releases that selection");
         assert.deepEqual(errors, []);
         await page.close();
       });
