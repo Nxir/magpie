@@ -307,7 +307,7 @@
       for (const [cls, fits] of Object.entries(marks)) node.classList.toggle(cls, fits(w));
     });
   }).observe(node);
-  byWidth(box, { max799: (w) => w < 800, min800: (w) => w >= 800, min1280: (w) => w >= 1280 });
+  byWidth(box, { min800: (w) => w >= 800, min1280: (w) => w >= 1280 });
   byWidth(main, { max560: (w) => w <= 560 });
   byWidth(list, { max460: (w) => w <= 460, max560: (w) => w <= 560 });
   byWidth(more, { max520: (w) => w <= 520, min1150: (w) => w >= 1150 });
@@ -2902,6 +2902,7 @@
         if (d.seq < seq) {
           routes.clear(); // the gateway started over: ids may be reused
           if (!day) { pinned = null; inspecting = false; }
+          if (rp && !day) { rp.back = null; rp.inspecting = false; }
           stopPlays();
         }
         seq = d.seq;
