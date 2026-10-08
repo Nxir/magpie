@@ -79,7 +79,7 @@ const look = (page) => page.evaluate(() => {
 
 // the reader scrolls to what they click with the wheel, as at a phone's
 // width the card is under the request list
-async function click(page, b) {
+async function scrollTo(page, b) {
   const h = page.viewportSize().height;
   for (let i = 0; i < 20; i++) {
     const r = await b.boundingBox();
@@ -88,6 +88,9 @@ async function click(page, b) {
     await page.mouse.wheel(0, r && r.y < 0 ? -200 : 200);
     await page.waitForTimeout(100);
   }
+}
+async function click(page, b) {
+  await scrollTo(page, b);
   await b.click();
   await page.waitForTimeout(300);
 }
@@ -143,8 +146,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         // opened again, it is all there; its title stays where it was and
         // the page doesn't follow it (a click never moves the page: with
         // a folded padding of its own, it moved 4px)
-        const b = page.locator(".rt-ctx .ctx-fold");
-        await click(page, page.locator(".rt-ctx .ctx-short"));
+        const b = page.locator(".rt-ctx-toggle");
+        await scrollTo(page, b);
         const before = await b.evaluate((e) => [e.getBoundingClientRect().top, document.querySelector("#view-routing").scrollTop]);
         await b.click();
         await page.waitForTimeout(800);

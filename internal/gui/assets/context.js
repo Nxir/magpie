@@ -113,24 +113,31 @@
     summary.append(el("span", "ctx-title", t("Context window")));
     if (open) {
       summary.append(el("span", "grow"), ctxState(r));
-      return into ? morph(into, summary) : summary;
+    } else {
+      const figures = el("span", "ctx-summary-numbers");
+      summary.append(figures);
+      const used = el("span", "ctx-summary-used");
+      used.append(el("b", "", fmtK(p.tokens)), window ? " / " + fmtK(window) : " " + t("tokens"));
+      used.title = t(p.counted ? "Counted" : "Estimated");
+      figures.append(used);
+      if (window) {
+        const fill = p.tokens / window, [tone, word] = health(fill);
+        const h = el("span", "ctx-health " + tone, pct(fill));
+        h.title = t(word) + " · " + t("{tokens} free", { tokens: fmtK(Math.max(0, window - p.tokens)) });
+        figures.append(h);
+      }
+      if (!p.counted || !r.done) figures.append(el("span", "ctx-summary-est", t(!r.done ? "Live" : "Estimated")));
+      const cache = cacheOf(r);
+      if (cache && p.counted !== false) figures.append(el("span", "ctx-summary-cache", t("Cache") + " " + pct(cache.read / cache.total)));
+      summary.append(ctxStack(p));
     }
-    const figures = el("span", "ctx-summary-numbers");
-    summary.append(figures);
-    const used = el("span", "ctx-summary-used");
-    used.append(el("b", "", fmtK(p.tokens)), window ? " / " + fmtK(window) : " " + t("tokens"));
-    used.title = t(p.counted ? "Counted" : "Estimated");
-    figures.append(used);
-    if (window) {
-      const fill = p.tokens / window, [tone, word] = health(fill);
-      const h = el("span", "ctx-health " + tone, pct(fill));
-      h.title = t(word) + " · " + t("{tokens} free", { tokens: fmtK(Math.max(0, window - p.tokens)) });
-      figures.append(h);
+    // A disclosure changes what the head contains. Reusing its figures as
+    // the empty spacer would make the click guard follow that child's new
+    // position, even though the head itself stayed put.
+    if (into && !!into.querySelector(".ctx-summary-numbers") === open) {
+      into.replaceChildren(...summary.childNodes);
+      return into;
     }
-    if (!p.counted || !r.done) figures.append(el("span", "ctx-summary-est", t(!r.done ? "Live" : "Estimated")));
-    const cache = cacheOf(r);
-    if (cache && p.counted !== false) figures.append(el("span", "ctx-summary-cache", t("Cache") + " " + pct(cache.read / cache.total)));
-    summary.append(ctxStack(p));
     return into ? morph(into, summary) : summary;
   }
   window.ctxSummary = ctxSummary;
