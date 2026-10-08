@@ -171,6 +171,14 @@ for (const engine of process.env.BROWSER ? [process.env.BROWSER] : ['chromium', 
       await send([req(1)], 1, 1);
       await selected(page, 1);
       assert.equal(await back(page, lang).count(), 0, 'gateway restart releases IDs from the previous run');
+      await story.click();
+      await story.click();
+      await click(page, page.locator('.rt-log-head button', { hasText: lang === 'zh' ? /^重放$/ : /^Replay$/ }));
+      await page.locator('.rt-replay').waitFor();
+      await send([req(1, { model: 'codex/restarted-during-replay' })], 1, 0);
+      await click(page, page.locator('.rp-top button', { hasText: lang === 'zh' ? '停止重放' : 'Stop replay' }));
+      await page.waitForFunction(() => document.querySelector('.rt-brief-path')?.textContent.includes('restarted-during-replay'));
+      assert.equal(await back(page, lang).count(), 0, 'replay cannot restore a selection from the previous gateway run');
     });
   }
 }
