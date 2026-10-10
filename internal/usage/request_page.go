@@ -52,6 +52,9 @@ type RequestPage struct {
 	// other computer's calls were brought here by sync (#542)
 	Computers []Share
 	Names     map[string]string
+	// Heat is the rows by day, as the chart's filter keeps them: only for
+	// the heatmap's own period (HeatmapOf)
+	Heat *Heatmap
 }
 
 type packedRow struct {
@@ -951,6 +954,15 @@ func buildRequestBlocks(p Period, f Filter, offset, limit int, now time.Time, ga
 			pt.By[d][k] = part
 		}
 	})
+	if p == heatmapPeriod {
+		out.Heat = heatmapOf(since, now, func(add func(Row)) {
+			visit(func(_ rowRef, r Row) {
+				if chartFilter.keepsRow(r) {
+					add(r)
+				}
+			})
+		})
+	}
 	// Match LedgerSeries's top-24 selection on the filtered data, not facets.
 	for _, d := range Dimensions {
 		kept := map[string]bool{}
@@ -1018,6 +1030,13 @@ func pageFromLedgerAt(p Period, f Filter, offset, limit int, all Ledgered, now t
 		out.ChartBy = map[string][]Share{}
 	}
 	out.Bucket, out.Series = ledgerSeriesAt(p, chartRows, now)
+	if p == heatmapPeriod {
+		out.Heat = heatmapOf(p.Since(now), now, func(add func(Row)) {
+			for _, r := range chartRows {
+				add(r)
+			}
+		})
+	}
 	for _, d := range Dimensions {
 		g := f
 		if d == "provider" {

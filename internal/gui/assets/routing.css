@@ -61,6 +61,18 @@
 .rt-accts li.rt-sub svg { flex: none; color: var(--fg-2); }
 .rt-accts li.rt-sub code.mdl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rt-accts li.rt-sub i { margin-left: auto; font-style: normal; font-size: 10.5px; font-weight: 560; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--fg-2); white-space: nowrap; }
+/* it folds from its heading (Aiirobyte on Discord): folded, it says what
+   it routes to together on a line of its own */
+.rt-accts li.rt-sub { flex-wrap: wrap; row-gap: 4px; cursor: pointer; user-select: none; }
+.rt-accts li.rt-sub .n { white-space: nowrap; }
+.rt-accts li.rt-sub .n:empty, .rt-accts li.rt-sub em:empty { display: none; }
+.rt-accts li.rt-sub .chev { display: inline-flex; color: var(--muted); transition: transform .2s; }
+.rt-accts li.rt-sub .chev svg { color: inherit; }
+.rt-accts li.rt-sub:hover .chev { color: var(--fg); }
+.rt-accts li.rt-sub.open .chev { transform: rotate(180deg); }
+.rt-accts li.rt-sub em { flex: 1 0 100%; min-width: 0; white-space: normal; padding-left: 21px; }
+.rt-accts li.rt-sub:focus { outline: none; }
+.rt-accts li.rt-sub:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
 .rt-accts li.idle { display: block; color: var(--muted); border-style: dashed; text-align: center; }
 .rt-accts b { font-weight: 560; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rt-accts b > span:not(.ic) { font-weight: 450; color: var(--muted); }
@@ -122,7 +134,7 @@
 .rt.min1280 .rt-log { grid-column: 2; grid-row: 3; margin-top: 16px; padding: 0 0 0 24px; border-top: 0; border-left: 1px solid var(--line); }
 .rt.min1280 .rt-off { grid-column: 1 / -1; }
 .rt-announcement { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.rt-brief { display: grid; gap: 8px; margin: 12px 0 6px; }
+.rt-brief { display: grid; align-content: start; gap: 8px; margin: 12px 0 6px; }
 .rt-brief-path { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 8px; color: var(--fg); font-size: 12px; }
 .rt-brief-path code { font-size: 11px; color: var(--fg-2); overflow-wrap: anywhere; }
 .rt-brief-path .rt-named { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
@@ -178,7 +190,7 @@
 .rt.min800 .rt-ctx-detail .ctx-contents { min-width: 0; padding: 0 0 0 24px; border-top: 0; border-left: 1px solid var(--line); }
 .rt-ctx-detail .ctx-body.max420 :is(.ctx-mini, .ctx-tag) { display: none; }
 .rt-ctx-detail .ctx-body.max520 .ctx-top { gap: 12px; }
-.rt-steps { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 5px; counter-reset: rt; }
+.rt-steps { list-style: none; margin: 6px 0 0; padding: 0; display: grid; align-content: start; gap: 5px; counter-reset: rt; }
 .rt-steps li { position: relative; padding-left: 20px; font-size: 12.5px; line-height: 1.45; color: var(--fg-2); }
 .rt-steps li::before { content: ""; position: absolute; left: 0; top: calc(.725em - 3px); width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
 .rt-steps li.why { color: var(--fg); }

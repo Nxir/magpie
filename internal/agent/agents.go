@@ -933,7 +933,7 @@ func gooseIn(at place, cfg string) *Agent {
 		// a goose on PATH may be pressly's database migration tool, a Go
 		// program; Block's goose is Rust, so a Go goose is not the agent
 		detect: func() bool {
-			if isDir(filepath.Dir(path)) {
+			if agentDir(filepath.Dir(path)) {
 				return true
 			}
 			bin, err := exec.LookPath("goose")

@@ -398,6 +398,10 @@ body.panel #agents > .row .ag-handle::before { left: -10px; }
 .ag-fix:active { transform: scale(.96); }
 .ag-fix:focus-visible { outline: 1.5px solid var(--drift); outline-offset: 1px; }
 .ag-fix.busy { pointer-events: none; opacity: .7; }
+/* the accounts that keep an agent going through magpie for failover (#1385) */
+.ag-acc { display: inline-flex; align-items: center; flex: none; height: 20px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--fg-2); font: inherit; font-size: 11.5px; line-height: 1; cursor: pointer; transition: background-color .15s, color .15s; }
+.ag-acc:hover { background: var(--pill); color: var(--fg); }
+.ag-acc:focus-visible { outline: 1.5px solid var(--fg-2); outline-offset: 1px; }
 .ag-fix.busy svg > * { transform-box: view-box; transform-origin: 50% 50%; animation: spin .8s linear infinite; }
 /* what has to listen at an address no agent reaches magpie by (#1013): long addresses wrap, and it can be copied */
 .drift-why { overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
@@ -492,7 +496,7 @@ body.window .agent-fold-cap { padding: 10px 14px 3px; }
 #providers.sorting .pv-handle { cursor: grabbing; }
 #providers > .row.dragging { position: relative; z-index: 2; background: var(--card); box-shadow: 0 6px 18px rgba(20, 22, 30, .12), 0 0 0 1px var(--line); border-radius: 8px; transition: none; }
 
-.pop.row-menu { width: auto; min-width: 176px; max-height: none; padding: 4px; border: 1px solid var(--line); display: grid; gap: 1px; }
+.pop.row-menu { width: auto; min-width: 176px; max-height: none; overflow-y: auto; overscroll-behavior: contain; padding: 4px; border: 1px solid var(--line); display: grid; gap: 1px; }
 .row-menu .rm-item { display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; padding: 0 8px; border: 0; border-radius: 7px; background: none; color: var(--fg); font: inherit; font-size: 12.5px; text-align: left; cursor: default; outline: none; }
 .row-menu .rm-item svg { flex: none; color: var(--muted); }
 .row-menu .rm-item:not(:disabled):is(:hover, :focus) { background: var(--pill); }
@@ -877,6 +881,25 @@ body.window .field.solo { grid-column: auto; }
   .led-strip .blk:nth-child(n + 3) { border-top: 1px solid var(--line-2); }
   .led-strip .blk:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
+/* the heatmap (#1369): 53 weeks of days, Monday on top, the cells growing a
+   little to take a wide card and scrolling sideways in it when narrow */
+.led-heat { position: relative; margin-bottom: 10px; padding: 10px 14px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.led-heat[hidden] { display: none; }
+.heat-title { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.heat-title b { font-size: 12.5px; font-weight: 600; }
+.heat-title span { font-size: 11px; color: var(--muted); }
+.heat-scroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: thin; padding-bottom: 4px; }
+.heat-grid { display: grid; grid-template-columns: auto repeat(53, minmax(10px, 1fr)); grid-template-rows: auto repeat(7, auto); gap: 3px; min-width: min-content; max-width: calc(3em + 53 * 21px); font-size: 10px; color: var(--muted); }
+.heat-grid i { aspect-ratio: 1; border-radius: 3px; min-width: 0; }
+.heat-grid i:hover { outline: 1px solid var(--fg-2); outline-offset: -1px; }
+/* the days of the week stay at the card's edge as the weeks scroll under them */
+.heat-grid .wd { position: sticky; left: 0; z-index: 1; align-self: stretch; display: flex; align-items: center; padding-right: 6px; line-height: 1; white-space: nowrap; background: var(--card); box-shadow: 3px 0 0 var(--card); }
+.heat-grid .mo { min-width: 0; white-space: nowrap; overflow: hidden; line-height: 1.2; padding-bottom: 2px; }
+.heat-foot { display: flex; justify-content: flex-end; margin-top: 4px; }
+.heat-tip { position: absolute; z-index: 3; display: flex; flex-direction: column; gap: 2px; padding: 6px 9px; background: var(--pop-bg); border-radius: 8px; box-shadow: var(--shadow); font-size: 11.5px; white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+.heat-tip[hidden] { display: none; }
+.heat-tip b { font-weight: 600; }
+.heat-tip span { color: var(--muted); }
 /* over the requests: their sum, and at its right the request archive's switch */
 .led-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin: 0 2px 7px; min-width: 0; }
 .led-head .led-sum { margin: 0; min-width: 0; }
@@ -1958,6 +1981,9 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
 .acc .text.quiet { opacity: 0; transition: opacity .15s; }
 .acc:hover .text.quiet { opacity: 1; }
 .acc .text.quiet:focus-visible { opacity: 1; }
+/* an account signed out (#1363) shows its Remove without a hover: it is
+   one of the two ways out of that state, beside Sign in again */
+.acc.signed-out .text.quiet { opacity: 1; }
 .acc.new { animation: sub-in .5s cubic-bezier(.2, .8, .2, 1); }
 .acc.new .dot { animation: copy-pop .45s cubic-bezier(.2, .8, .2, 1); }
 @keyframes sub-in { from { opacity: 0; transform: translateY(-4px); background: var(--pill-hover); } }
@@ -2119,6 +2145,13 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
 .acc .aq-track.capped { position: relative; overflow: visible; }
 .acc .aq-track.capped i { overflow: hidden; }
 .acc .aq-cap { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--accent); }
+/* a window's meter sets its own cap (willz on Discord): a button that
+   looks as the meter does, and the window's own cap beside its figure */
+.acc .aq-win { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.acc .aq-set { padding: 1px 4px; margin: -1px -4px; border-radius: 4px; cursor: default; }
+.acc .aq-set:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.acc .aq-set:hover, .acc .aq-set.open { background: var(--pill-hover); }
+.acc .aq-own { color: var(--accent); font-weight: 500; }
 .acc .aq-w b { color: var(--fg-2); font-weight: 600; font-variant-numeric: tabular-nums; }
 .acc .aq-w.full b, .acc .aq-w.full .aq-r { color: var(--fg); }
 .acc .aq-w.full .aq-track i { background: var(--fg); }
@@ -3123,6 +3156,13 @@ body.window .row.agent .who.with-models { flex-wrap: wrap; row-gap: 0; }
 .am-reset:disabled { color: var(--faint); cursor: default; }
 .am-reset[data-armed] { color: var(--red); background: var(--red-soft); }
 .am-dot { color: var(--faint); }
+/* the agent's own switch: a model that comes later shown, or off until
+   ticked (#1337); its words give way before the buttons beside it do */
+.am-only { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--fg-2); cursor: pointer; }
+.am-only[hidden] { display: none; }
+.am-only .lib-switch { flex: none; }
+.am-only > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-foot .am-reset { flex: none; }
 /* Codex's list in the order it shows it (#855): the whole list, dragged by
    any row; its grip shows only on the row under the pointer */
 .pop.am-pop.ordering .am-search, .pop.am-pop.ordering .am-rail { display: none; }
@@ -3230,6 +3270,9 @@ body.window .row + .row.agent.conn > .who { min-height: 41px; } /* the line abov
 .ag-longest-say { color: var(--fg-2); }
 /* which copy is left on the old list: a sentence that wraps as one, under the warning's words */
 .ag-vl.ag-stale-copy { display: block; padding-left: 14px; font-size: 12px; line-height: 1.6; color: var(--fg-2); }
+/* Codex's daemon: restarted from its line, a button that sits in the sentence */
+.ag-stale-copy .ag-quiet { height: 20px; margin-left: 4px; padding: 0 6px; vertical-align: middle; }
+.ag-stale-copy .ag-quiet.busy { opacity: .6; cursor: progress; }
 .ag-hint { font-size: 12px; color: var(--muted); }
 .ag-tier { width: 70px; flex: none; font-size: 12px; color: var(--fg-2); }
 .ag-vl .field.ag-pick { width: 220px; justify-content: flex-start; }

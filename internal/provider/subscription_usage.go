@@ -65,6 +65,9 @@ type QuotaWindow struct {
 	// only — one model's own, or a pool's — so the cap holds the account
 	// for those alone, and the GUI says which.
 	CapsSome bool `json:"capsSome,omitempty"`
+	// CapID is, beside Capped, how the window is known to a cap of its
+	// own (WindowCapID), for the GUI to set and show one.
+	CapID string `json:"capId,omitempty"`
 	// Holds is what the whole window holds, reckoned from magpie's own
 	// calls through the account (usage.WithWindowHolds), for the GUI only;
 	// nil where that can't be told honestly.

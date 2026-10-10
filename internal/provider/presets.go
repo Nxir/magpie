@@ -493,6 +493,9 @@ var presets = []PresetDef{
 	{ID: "omlx", Name: "oMLX", Icon: "omlx", Kind: KindLocal, NoKey: true,
 		Chat: "http://localhost:8000/v1", Responses: "http://localhost:8000/v1", Anthropic: "http://localhost:8000",
 		Note: "local server on :8000", Website: "https://omlx.ai"},
+	{ID: "mlx-serve", Name: "MLX-Serve", Icon: "mlx-serve", Kind: KindLocal, NoKey: true,
+		Chat: "http://localhost:11234/v1", Responses: "http://localhost:11234/v1", Anthropic: "http://localhost:11234",
+		Note: "local server on :11234", Website: "https://github.com/ddalcu/mlx-serve"},
 }
 
 func bedrockChat(region string) string {

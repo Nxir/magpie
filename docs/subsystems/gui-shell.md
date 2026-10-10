@@ -14,8 +14,8 @@ three.
 | Native host | `Run` starts the Wails v3 app: the tray icon, the panel, the main window, single-instance handover, `magpie://` import links and open at login. `host` implements `Windows` for the API: show and hide, open URLs and folders, copy to the clipboard, fit and tint the panel, and set the text size. | [`app.go`](../../internal/gui/app.go), [`mainwindow.go`](../../internal/gui/mainwindow.go), [`traymenu.go`](../../internal/gui/traymenu.go) |
 | Backend | `startBackend` starts the gateway this process serves, unless another magpie already serves it. In that case this process only shows the other one's status (`gw` is nil). `stopServing` drains requests in flight. | [`backend.go`](../../internal/gui/backend.go) |
 | API and assets | `Handler` serves `assets/` (embedded with `//go:embed assets`) and the `/api/*` routes, such as `/api/state`, `/api/set` and `/api/agents/{action}/{id}`. `held` lets one API request's reads share one catalog build (`provider.Hold`), and drops it after any write. `revalidated` and `versionedPage` name each script by its content hash, so a cache never serves an old `app.js` under a new page. | [`api.go`](../../internal/gui/api.go) |
-| Browser mode | `StartWeb` serves the page and the gateway for `magpie web`. The browser signs in with a run key in a link. Gateway mode shows only Providers, Gateway, Routing, Usage, Plugins and Settings on a machine that is only a gateway. | [`web.go`](../../internal/gui/web.go), [`gatewaymode.go`](../../internal/gui/gatewaymode.go) |
-| The page | `app.js` keeps one state object per view and renders it into a list, with no framework. The views have their own files: `routing.js`, `library.js`, `plugins.js`, `sessions.js` and `context.js` (Usage's Context tab, and the context window card the Routing page draws under a request's story, fed by `/api/context` in `context.go`, which scores and tags each agent). Strings go through `t()` with translations in `i18n.js` (zh, zh-TW, ja and de; the English text is the key and the fallback). zh-TW is Traditional Chinese with Taiwan's words; a system language of zh-TW, zh-HK, zh-MO or any zh-Hant picks it, and the tray menu and notifications follow (`trayLang`). Dropdowns use `openProtoMenu`. Scrolling is done only by `scrollOnPurpose(e)` with the reader's event. | [`assets/app.js`](../../internal/gui/assets/app.js), [`assets/i18n.js`](../../internal/gui/assets/i18n.js) |
+| Browser mode | `StartWeb` serves the page and the gateway for `magpie web`. The browser signs in with a run key in a link. Gateway mode shows Providers, Gateway, Routing, Usage, Sessions, Plugins and Settings on a machine that is only a gateway. | [`web.go`](../../internal/gui/web.go), [`gatewaymode.go`](../../internal/gui/gatewaymode.go) |
+| The page | `app.js` keeps one state object per view and renders it into a list, with no framework. The views have their own files: `routing.js`, `library.js`, `plugins.js`, `sessions.js` and `context.js` (Usage's Context tab, and the context window card the Routing page draws under a request's story, fed by `/api/context` in `context.go`, which scores and tags each agent). Strings go through `t()` with translations in `i18n.js` (zh, zh-TW, ja and de; the English text is the key and the fallback). zh-TW is Traditional Chinese with Taiwan's words; a system language of zh-TW, zh-HK, zh-MO or any zh-Hant picks it, and the tray menu and notifications follow (`trayLang`). Dropdowns use `openProtoMenu`. Every app menu (`openProtoMenu`, `openRowMenu`, `openSessCombo`) is placed by `placeMenu`: under its anchor, or over it when the window runs out below; one that fits neither way takes the larger room, its height held to it, and scrolls inside itself, and a scroll inside a menu doesn't close it (#1437, `removed-groups-menu-scroll.test.cjs`). Scrolling is done only by `scrollOnPurpose(e)` with the reader's event. | [`assets/app.js`](../../internal/gui/assets/app.js), [`assets/i18n.js`](../../internal/gui/assets/i18n.js) |
 | No GUI build | `-tags nogui` builds magpie without the GUI: `hasGUI` is false and `runGUI` says to use `magpie tui`. The files of `internal/gui` that need Wails build under `!nogui`. | [`gui_off.go`](../../gui_off.go) |
 
 ## Runtime path
@@ -24,7 +24,7 @@ three.
 2. `startBackend` brings up the gateway, or finds another magpie serving it.
 3. The panel and the window load `index.html` from `Handler`. `boot.js` passes the saved language, theme, text size and desktop font choices before the first paint.
 4. The page reads `GET /api/state` and writes through `POST` routes. Each write answers with the new state, built under `held`.
-5. Closing the window hides it. On the Mac a full-screen window first leaves full screen (`closeStep`). The system's close on the panel (a title bar's X, Alt+F4, a window manager's close key) hides it as Escape does, so the tray icon opens it again; a panel lightweight mode let go, no longer `h.panel`, closes (`makePanel`, `TestPanelCloseHidesIt`).
+5. Closing the window hides it. On the Mac a full-screen window first leaves full screen (`closeStep`). The system's close on the panel (a title bar's X, Alt+F4, a window manager's close key) hides it as Escape does, so the tray icon opens it again; a panel lightweight mode let go, no longer `h.panel`, closes (`makePanel`, `TestPanelCloseHidesIt`). Lightweight mode lets go only of a window closed this way: one covered by another app's window, minimised, or open as magpie was hidden is still open (`windowUp`, not Wails' `IsVisible`, which is the occlusion state), and so is it for the Dock while the window is open and for a restart (#1381, `TestCoveredWindowStaysUp`).
 6. The window opens as it was last left. Its settled size and whether it was maximised are kept in `settings.Window` and `settings.WindowMaximised` (`settle`; per machine, see `KeepOwn`). A maximised window keeps the size it restores to. `makeMain` opens it at that size (`openSize`). On its first show, `placeMain` maximises it again on the Mac and Windows (on Windows once the page has come). On Linux, `makeMain` makes it maximised with `StartState`. On Windows a size larger than the screen's work area is fitted and centred (`fitRoom`), and the larger size stays kept. The window's position is not kept.
 
 ## Constraints and failure behavior
@@ -72,6 +72,11 @@ Incoming requests do not open them and continue updating
 the visible request even while details are open. An open context keeps its
 card, grid and unchanged rows in place as live requests arrive; a prompt
 still being read retains the previous context until its counts arrive.
+While following live, the request heading and summary retain their largest
+height at the current width and detail preference. Opening or closing details
+measures them again. The context state pill keeps one width across its labels;
+an in-progress request keeps its session's last cache figure dimmed until the
+vendor reports its own. A missing cache keeps the same space with an explanation.
 On a wide routing card
 (1280px or more), the routing stage and request story sit beside each other.
 Context remains below both, pairing its overview with the content list at
@@ -103,21 +108,33 @@ filter only when that request is excluded. Usage's purpose picker remains a
 single choice sent to the ledger API. See `purpose-filter.test.cjs` and
 `routing-purpose-state.test.cjs`.
 
-### Routing key folds
+### Routing key and account folds
 
-Three or more API keys of one provider standing next to each other for one
-model (same fixed effort, fallback and group-in-group heading) fold into one
-stage row, `li.rt-fold` in [`routing.js`](../../internal/gui/assets/routing.js)
-(`FOLD_AT`, `rebuild`). It shows the key count and the keys' state together:
-the key that is lit and what it is doing, how many are available and how
-many rest. Requests that land on a folded key fly to the fold (`shownRow`).
-Clicking it (or Enter / Space) shows each key in place, wired from the fold.
-Accounts and keys folds the same provider's keys into one `.rt-keys` row
-with their summed tally. Which folds are open is kept per reader in
-localStorage `magpie.routingKeysOpen` (`provider/model` on the stage,
-`provider/*` in the list). Display only: the gateway's order and choice of
-key don't change. Two keys stay two rows. See
-`routing-keys-fold.test.cjs`.
+Three or more API keys, or three or more accounts, of one provider standing
+next to each other for one model (same fixed effort, fallback and
+group-in-group heading) fold into one stage row, `li.rt-fold` in
+[`routing.js`](../../internal/gui/assets/routing.js) (`FOLD_AT`,
+`rebuild`). It shows the count and their state together: the one that is
+lit and what it is doing, how many are available and how many rest
+(`together`). Requests that land on a folded seat fly to the fold
+(`shownRow`). Clicking it (or Enter / Space) shows each in place, wired
+from the fold. Accounts and keys folds a provider's keys, and its accounts,
+into one `.rt-keys` row each with their summed tally.
+
+A group in the group's heading (`li.rt-sub`, `subNode`) folds the same way
+(`toggleSub`): folded, it says how many it routes to and what they do
+together, a request to any seat under it flies to the heading
+(`row.shut`), and its wire is the last one drawn (`wiresTo`).
+
+Keys start folded. Accounts and group-in-group headings start open when
+they hold fewer than `LONG` (6), folded otherwise (Aiirobyte on Discord: a
+group of many accounts took the page). What the reader opens is kept in
+localStorage `magpie.routingKeysOpen` and what they fold in
+`magpie.routingFolded` (`keepOpen`, `isOpen`), keyed `provider/model` for
+keys and `provider/model@` for accounts on the stage, `provider/*` and
+`provider/@` in the list, and `group/<id>` for a heading. Display only: the
+gateway's order and choice of seat don't change. Two stay two rows. See
+`routing-keys-fold.test.cjs` and `routing-group-fold.test.cjs`.
 
 ### Desktop fonts
 
@@ -165,6 +182,7 @@ axis controls.
 - The Usage page's cards and the tray panel's Allowances tab share one order, `settings.UsageOrder` (`byUsageOrder`). The panel's *Arrange* (`panelArrange`) moves rows in it and hides subscriptions from that tab alone (`settings.PanelUsageHidden`); both save through `POST /api/usage/arrange`, which changes only the field it is sent, and the Settings save keeps both. Hiding is display only: a menu bar cell's card shows though hidden (`panelPeek`). See `TestUsageArrangePanelHidden` and `panel-arrange.test.cjs`.
 - The page must work in Chromium (Windows' WebView2) and WebKit (macOS, and WebKitGTK on Linux). GUI tests run in both engines.
 - On Linux the panel is frameless and the main window has a hidden title bar (`plainTitlebar`). GTK 3 asks KDE's Wayland session (KWin's decoration protocol) for a frame drawn by KWin on any window without client-side decorations, an undecorated one too, so `ownFrame` tells KWin the panel draws its own on each realize (#1283). GTK 4 builds ask for none themselves.
+- On GTK 3 builds, the app gives GDK a font DPI before the first webview when it has none (`fontDPI`, [`fontdpi_gtk3.h`](../../internal/gui/fontdpi_gtk3.h)). GDK's unset value is -1, and WebKitGTK 2.54's GTK 3 settings reader multiplies it by 1024 unchecked, so every page lays out at a negative width with a 9000000px font (#1371). An unset DPI takes `gtk-xft-dpi`, or 96, times a valid `GDK_DPI_SCALE`; a positive one is left alone. Wails initialises GTK (its GtkApplication) only inside `Run` and makes each window from a default-idle-priority callback on the main loop, so `fontDPI`, called just before `Run`, queues the check as a `G_PRIORITY_HIGH` idle: it runs on the main thread after GTK's own start, before the first window. `TestFontDPIUnset` opens a real WebKitGTK page through `magpie_font_dpi` and needs a display (Xvfb).
 - Tests never touch a live agent config. The package's `TestMain` runs under `testenv`'s home of its own. A macOS test that shows windows runs them in a process of its own through `runAppKit` ([`appkit_darwin_test.go`](../../internal/gui/appkit_darwin_test.go)). AppKit and WebKit take their home from the account, not from HOME, so `runAppKit` gives them a temporary one with `CFFIXED_USER_HOME`; appearance, contrast and languages still come from the account. The test fails when that process leaves a folder in the real `~/Library/WebKit` or `~/Library/Caches`. Playwright tests serve `assets/` with isolated `/api` fixtures.
 - `POST /api/settings/codex-auto-review` accepts an empty value (Codex's own choice) or an exact model/group ID in `provider.Served`, including unlisted providers. A known provider with an unknown or empty model name is rejected without changing the saved reviewer or catalog tag. Generic gateway request resolution remains permissive; it is not the validator for this setting. See `Handler` in [`api.go`](../../internal/gui/api.go) and `TestCodexAutoReviewSetting` in [`codex_auto_review_test.go`](../../internal/gui/codex_auto_review_test.go).
 

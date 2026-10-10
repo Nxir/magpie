@@ -389,9 +389,24 @@ func partnerPreset(id string) *PresetDef {
 	return &d
 }
 
-// resetPartners forgets the list held in memory, for tests.
+// resetPartners forgets the list held in memory, for tests. A fetch
+// still running would store its list over the one held after the reset,
+// so it is waited for first.
 func resetPartners() {
-	partnerMu.Lock()
+	claimPartnerFetch()
 	partnerState, partnerNext, partnerFetches = nil, time.Time{}, false
 	partnerMu.Unlock()
+}
+
+// claimPartnerFetch waits for the fetch running, if any, to end and returns
+// with partnerMu held and no fetch running, for tests.
+func claimPartnerFetch() {
+	for {
+		partnerMu.Lock()
+		if !partnerFetches {
+			return
+		}
+		partnerMu.Unlock()
+		time.Sleep(5 * time.Millisecond)
+	}
 }

@@ -97,7 +97,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       page.on("pageerror", (e) => errors.push(e.message));
       await page.route("**/*", f.route);
       await page.goto("http://magpie.test/?view=routing");
-      await page.locator(".rt-accts > li.rt-fold").click();
+      // the relay's keys start folded (the accounts' folds, fewer than six, start open)
+      await page.locator(".rt-accts > li.rt-fold:not(.open)").click();
       await page.locator(".rt-accts > li[title]:not(.rt-fold)").nth(8).waitFor();
       assert.deepEqual(await seated(page), listed(f), "each provider's rows in its list's order, not by name nor as weighed");
       assert.deepEqual(listed(f).antigravity, ["ag-a@x.test", "ag-c@x.test", "ag-b@x.test"]);

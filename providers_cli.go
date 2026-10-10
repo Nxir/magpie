@@ -29,19 +29,23 @@ const providerUsage = `usage:
   magpie provider <id>                    show one provider and its models
   magpie provider add <preset> <key>      add a preset vendor   e.g. magpie provider add deepseek sk-…
                                           again, it adds another (deepseek-2); k=v pairs too: id, name, header.X-Foo
-  magpie provider add <name> k=v…         add a custom vendor   k: url, anthropic, responses, gemini, decide, key, models, catalog, icon, header.X-Foo, balance, balance.path, balance.token, models.url, search
+  magpie provider add <name> k=v…         add a custom vendor   k: url, anthropic, responses, gemini, decide, key, models, catalog, icon, header.X-Foo, balance, balance.path, balance.token, models.url, search,
+                                          access.key, access.secret (a Volcengine account's access key, for its plan's windows)
   magpie provider set <id> k=v…           change a provider's settings, with the same k=v pairs as add
   magpie provider key <id> <key>          change the API key
   magpie provider icon <id> <file|name>   give a custom provider a picture (PNG, JPEG, SVG…) or a built-in icon
   magpie provider fallback <id> <provider/model>…   where requests go when it's out of quota or down (none clears)
   magpie provider models <id> [ids…]      fetch the vendor's model list, or choose which models to expose:
                                           ids… replace the list, +id adds one, -id takes one out, all: the default
-  magpie provider refresh <id>            fetch the vendor's model list again (as the app's Refresh)
+  magpie provider refresh <id>            fetch the vendor's model list again (as the app's Fetch models)
   magpie provider account-models <id> [account|key [ids…|all]]
                                           the models one account or key alone serves; all: every model the provider has
   magpie provider account-cap <id> [account [percent|off]]
                                           use a subscription account up to a share of each usage window (e.g. 70):
                                           at it, routing takes the account for used up until the window renews
+  magpie provider account-cap <id> <account> --window <name> [percent|none|default]
+                                          a share for one window alone (e.g. "5 hours" 50): none is no cap on it,
+                                          default has it follow the account's cap
   magpie provider account-concurrency <id> [account|key [n|off|default]]
                                           how many requests one account or key has out at once, over every model,
                                           routing group and agent: its own, off for none, default for the provider's
@@ -237,7 +241,9 @@ func models(args []string) error {
 		}
 		entries, hidden = provider.CatalogFor(agentID)
 	}
-	if len(entries) == 0 && agentID != "" {
+	if _, only := provider.PickedModels(agentID); len(entries) == 0 && agentID != "" && only {
+		fmt.Println(amber.Render("!"), agentID, "is shown none of them: it is shown only the models picked for it, and none is", muted.Render("· tick some in its list on the Agents page, or magpie visible "+agentID+" --show-new"))
+	} else if len(entries) == 0 && agentID != "" {
 		names, _ := provider.VisibleTo(agentID)
 		fmt.Println(amber.Render("!"), agentID, "is shown none of them: nothing is in", strings.Join(names, ", "), muted.Render("· magpie visible "+agentID+" all shows it every model"))
 	} else if len(entries) == 0 && bad != nil {
@@ -642,12 +648,12 @@ func announce(id string) error {
 	defer cancel()
 	if ms, err := saved.Fetch(ctx); err == nil {
 		fmt.Println(green.Render("✓"), len(ms), "models from", fetchedFrom(*saved))
-	} else if !saved.Decides() {
+	} else if !saved.DecideOnly() {
 		// the URLs asked and what they said; the base stays as given
 		fmt.Println(amber.Render("!"), muted.Render(err.Error()))
 	}
 	n := len(saved.Exposed())
-	if saved.Decides() {
+	if saved.DecideOnly() {
 		fmt.Println("  it routes groups: magpie group set <id> effort=auto classifier="+saved.ID+"/"+saved.Jev(),
 			muted.Render("· or a rule's intent=…"))
 		return nil
@@ -818,6 +824,12 @@ func applyPairs(p *provider.Provider, pairs []string) error {
 			p.BalancePath = v
 		case "balance.token":
 			p.BalanceToken = v
+		case "access.key":
+			// a Volcengine account's access key, which Ark tells its
+			// Coding or Agent Plan's windows to (#1427)
+			p.AccessKeyID = v
+		case "access.secret":
+			p.SecretAccessKey = v
 		case "models.url":
 			p.ModelsURL = v
 		case "search":
@@ -948,15 +960,16 @@ func refreshLive(ctx context.Context) {
 	}
 }
 
-// keyNote says who the gateway takes any key from: this machine alone,
-// unless MAGPIE_ADDR puts it on the network (a server, a Docker image)
-// without sharing it from Settings, when it is anyone who reaches it.
+// keyNote says who the gateway takes any key from: this machine (in a
+// container, the container) alone. Shared from Settings, or put on the
+// network by MAGPIE_ADDR (a server, a Docker image), it takes others with
+// an enabled gateway key.
 func keyNote() string {
-	if s := settings.Load(); s.LAN {
+	if settings.Load().LAN || gateway.OnNetwork() {
+		if gateway.InContainer() {
+			return "(anything works inside the container; from its host and other machines, an enabled gateway key — magpie gateway-key add <name>)"
+		}
 		return "(anything works from this machine; from others, an enabled gateway key — magpie gateway-key add <name>)"
-	}
-	if gateway.OpenToAnyone() {
-		return "(anything works, from anyone who reaches it — share it from Settings to require a key)"
 	}
 	return "(anything works; the gateway only listens on localhost)"
 }
@@ -996,6 +1009,9 @@ func serve() error {
 	s := gateway.New()
 	go stats.Run(version, "serve")
 	go catalog.KeepFresh() // new models' prices, in a gateway left running
+	// Codex's background app-server, restarted when it has the list from
+	// before a change and no codex session is on it
+	go agent.KeepCodexDaemonCurrent(context.Background())
 	public := advertisedURL()
 	fmt.Println(green.Render("●"), "magpie gateway on", bold.Render(gateway.URL()))
 	fmt.Println(muted.Render("  OpenAI  "), public+"/v1/chat/completions", muted.Render("·"), public+"/v1/responses")
@@ -1131,10 +1147,30 @@ func accountModelsCmd(rest []string) error {
 
 // accountCapCmd shows, or sets with a share or off, the usage cap of a
 // subscription's accounts: the share of each window one is used to at most
-// (provider.AccountCaps).
+// (provider.AccountCaps); with --window <name>, the share of that window
+// alone (provider.AccountWindowCaps).
 func accountCapCmd(rest []string) error {
-	if len(rest) < 1 {
-		return fmt.Errorf("magpie provider account-cap <id> [account [percent|off]]")
+	usage := fmt.Errorf("magpie provider account-cap <id> [account [percent|off]]\n       magpie provider account-cap <id> <account> --window <name> [percent|none|default]")
+	window, windowSet := "", false
+	for i := 0; i < len(rest); i++ {
+		a := rest[i]
+		if v, ok := strings.CutPrefix(a, "--window="); ok {
+			window, windowSet = v, true
+			rest = slices.Delete(slices.Clone(rest), i, i+1)
+			i--
+			continue
+		}
+		if a == "--window" {
+			if i+1 >= len(rest) {
+				return usage
+			}
+			window, windowSet = rest[i+1], true
+			rest = slices.Delete(slices.Clone(rest), i, i+2)
+			i--
+		}
+	}
+	if len(rest) < 1 || windowSet && (len(rest) < 2 || strings.TrimSpace(window) == "") {
+		return usage
 	}
 	p, err := provider.Find(rest[0])
 	if err != nil {
@@ -1144,12 +1180,23 @@ func accountCapCmd(rest []string) error {
 		return fmt.Errorf("%s has keys, not subscription accounts with usage windows to cap", p.Name)
 	}
 	if len(rest) > 2 {
-		cap, err := provider.ParseCap(rest[2])
-		if err != nil {
-			return err
-		}
-		if err := provider.SetAccountCap(p.ID, rest[1], cap); err != nil {
-			return err
+		if windowSet {
+			cap, err := parseWindowCap(rest[2])
+			if err != nil {
+				return err
+			}
+			err = provider.SetWindowCap(p.ID, rest[1], window, cap)
+			if err != nil {
+				return err
+			}
+		} else {
+			cap, err := provider.ParseCap(rest[2])
+			if err != nil {
+				return err
+			}
+			if err := provider.SetAccountCap(p.ID, rest[1], cap); err != nil {
+				return err
+			}
 		}
 		if p, err = provider.Find(p.ID); err != nil {
 			return err
@@ -1167,13 +1214,40 @@ func accountCapCmd(rest []string) error {
 		return nil
 	}
 	for _, r := range refs {
-		if c := p.AccountCap(r); c > 0 {
-			fmt.Printf("%s · capped at %d%% of each usage window\n", r, c)
+		caps := p.CapsOf(r)
+		if caps.All > 0 {
+			fmt.Printf("%s · capped at %d%% of each usage window\n", r, caps.All)
+		} else if len(caps.Windows) > 0 {
+			fmt.Println(r, muted.Render("· no cap on its other windows: used to 100%"))
 		} else {
 			fmt.Println(r, muted.Render("· no cap: used to 100%"))
 		}
+		for _, w := range slices.Sorted(maps.Keys(caps.Windows)) {
+			if c := caps.Windows[w]; c >= 100 {
+				fmt.Printf("  %s · no cap on this window\n", w)
+			} else {
+				fmt.Printf("  %s · capped at %d%%\n", w, c)
+			}
+		}
 	}
 	return nil
+}
+
+// parseWindowCap reads a window's own share as the CLI takes it: "50",
+// "50%", none (off, 100) for no cap on that window, default (-) to follow
+// the account's cap.
+func parseWindowCap(s string) (int, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "default", "account", "-", "0":
+		return 0, nil
+	case "none", "off", "no", "100", "100%":
+		return 100, nil
+	}
+	n, err := provider.ParseCap(s)
+	if err != nil {
+		return 0, fmt.Errorf("a window's cap is a share from %d to %d (percent), none for no cap on it, or default to follow the account's cap, not %q", provider.MinCap, provider.MaxCap, s)
+	}
+	return n, nil
 }
 
 // accountConcurrencyCmd shows, or sets, the limit on requests at once of a

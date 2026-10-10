@@ -51,8 +51,8 @@ type candidate struct {
 	capped *capHold
 }
 
-// capHold is how an account is held at its usage cap: the cap, the share
-// of the fullest window at or past it, and when the last such window
+// capHold is how an account is held at its usage cap: the cap of the
+// fullest window at or past its own cap, that window's share used, and when the last such window
 // renews (zero when one doesn't say). noCredits: it is a Codex account
 // held at 100% as it is set not to spend its credits (cap is 100 then).
 type capHold struct {
@@ -491,23 +491,24 @@ func planLevel(g provider.Group, ms []provider.Member, depth int, from provider.
 }
 
 // capHeld is how the account acct of p is held at its usage cap for
-// model at now, or at 100% as a Codex account set not to spend its
-// credits; nil when nothing holds it or it is below the share. Its windows
+// model at now — a window at or past its own cap, else the account's — or
+// at 100% as a Codex account set not to spend its credits; nil when
+// nothing holds it or every window is below its share. Its windows
 // are those last read (allowances), as smart routing weighs them.
 func capHeld(p, acct provider.Provider, model string, now time.Time) *capHold {
 	if acct.Account == nil {
 		return nil
 	}
 	a := acct.Account
-	share, noCredits := provider.HoldShare(p, a.Agent, a.User)
-	if share <= 0 {
+	caps := provider.HoldCaps(p, a.Agent, a.User)
+	if !caps.Holds() {
 		return nil
 	}
-	held, used, back := allowances(a.UsageAgent())[a.User].CapHeld(model, share, now)
-	if !held {
+	h := allowances(a.UsageAgent())[a.User].CapHeld(model, caps, now)
+	if h == nil {
 		return nil
 	}
-	return &capHold{cap: share, used: used, back: back, noCredits: noCredits}
+	return &capHold{cap: h.Cap, used: h.Used, back: h.Back, noCredits: h.Credits}
 }
 
 // cappedError says why a request for model went nowhere when every account
@@ -716,12 +717,35 @@ var unservedWords = regexp.MustCompile(`(?i)model.{0,80}(not (supported|accessib
 // and its other models are asked as before. A refusal that also says
 // quota, credit or a rate limit is about the account, and rests it.
 func modelRefused(status int, body []byte) bool {
+	if modelRetired(status, body) {
+		return true
+	}
 	switch status {
 	case 400, 403, 404, 422:
 	default:
 		return false
 	}
 	return unservedWords.Match(body) && !quotaWords.Match(body) && !refusedWords.Match(body)
+}
+
+// retiredWords are how a vendor says the model is retired, though its
+// list may still name it: OpenCode Zen's 410 {"type":"error","error":
+// {"type":"ModelDeprecated","message":"Model exo-free has been
+// deprecated."}} (MOMO on Discord), OpenAI's "The model … has been
+// deprecated".
+var retiredWords = regexp.MustCompile(`(?i)"ModelDeprecated"|model_deprecated|model.{0,80}(has been|was|is now|is) (deprecated|retired|discontinued|decommissioned|sunset)`)
+
+// modelRetired says the vendor turned the request away because the model
+// is retired there: it leaves that provider's place in the lists
+// (provider.Retire), only it rests, and another provider of it, or the
+// group's next member, is asked. Not when it also says quota or credit.
+func modelRetired(status int, body []byte) bool {
+	switch status {
+	case 400, 404, 410, 422:
+	default:
+		return false
+	}
+	return retiredWords.Match(body) && !quotaWords.Match(body)
 }
 
 // refusedWords are how a vendor says it won't take requests from this
@@ -788,6 +812,9 @@ func retryable(status int, body []byte) bool {
 		// account of it: the agent is told, and compacts
 		return false
 	case status == 401, status == 402, status == 403, status == 404, status == 408, status == 429, status >= 500:
+		return true
+	case modelRetired(status, body):
+		// another provider of the model may still serve it
 		return true
 	case status >= 400 && provider.EdgeBlocked(body):
 		// the vendor's firewall blocked this address (Alibaba Cloud's 405
@@ -1065,11 +1092,22 @@ type holdWriter struct {
 	// takes; slow says it took longer, and was let go with nothing sent
 	firstWait time.Duration
 	slow      bool
+
+	// loop reads a streamed reply for a loop it won't leave (#1359), nil
+	// when Settings' NoLoopGuard is on or the agent asked for no stream;
+	// looped is what the agent was told once one was found, the reply
+	// ended there
+	loop   *loopGuard
+	looped string
 }
 
 // errSlowStart is what a try's writes get once it was let go for taking
 // longer than its group waits for a first token.
 var errSlowStart = errors.New("let go: no first token in time")
+
+// errLooped is what a try's writes get once its reply was ended for
+// looping (cutLoop).
+var errLooped = errors.New("ended: the reply was stuck in a loop")
 
 func newHoldWriter(w http.ResponseWriter, hold bool) *holdWriter {
 	return &holdWriter{w: w, hold: hold, header: http.Header{}, first: firstToken{start: time.Now()}}
@@ -1144,8 +1182,16 @@ func (h *holdWriter) Write(b []byte) (int, error) {
 	if h.slow {
 		return 0, errSlowStart
 	}
+	if h.looped != "" {
+		return 0, errLooped
+	}
 	if h.status == 0 {
 		h.writeHeader(http.StatusOK)
+	}
+	if h.loop != nil && !h.whole && h.status < 400 {
+		if t, ok := h.loop.feed(b); ok {
+			return h.cutLoop(b, t)
+		}
 	}
 	h.see(b)
 	h.first.see(b)
@@ -1181,6 +1227,35 @@ func (h *holdWriter) Write(b []byte) (int, error) {
 		h.scan()
 	}
 	return n, err
+}
+
+// cutLoop ends a reply found stuck in a loop (loopGuard): what came of it
+// goes to the agent as it would have, the held part of it too, and then
+// the stream's error in the agent's protocol, which Codex asks again on
+// and other agents show; the vendor's request is let go, and the try's
+// writes after it fail. The stream is no longer held for another to
+// answer: its loop was said as it came, unless the model's reasoning is
+// held for a refusal, and then it goes now.
+func (h *holdWriter) cutLoop(b []byte, t loopTrip) (int, error) {
+	msg := t.message()
+	if h.passing {
+		h.sent(b)
+		h.w.Write(b)
+	} else {
+		h.held.Write(b)
+		h.flow()
+	}
+	proto := provider.Chat
+	if h.alive != nil {
+		proto = h.alive.proto
+	}
+	streamError(h.w, proto, http.StatusBadGateway, msg)
+	h.looped, h.ended = msg, true
+	h.flush()
+	if h.stop != nil {
+		h.stop()
+	}
+	return 0, errLooped
 }
 
 // sseStart reports whether a body that begins with head is server-sent

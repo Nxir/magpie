@@ -36,7 +36,7 @@ func (p Provider) Available() []catalog.Model {
 		// a gateway's Jev among its chat models, with its window and input
 		ms = slices.Clone(ms)
 		for i, m := range ms {
-			if p.DecidesModel(m.ID) {
+			if p.isDecision(m) {
 				ms[i] = withDecideFacts([]catalog.Model{m})[0]
 			}
 		}
@@ -60,7 +60,7 @@ func (p Provider) available() []catalog.Model {
 			}
 		}
 	}
-	if live, _, ok := p.live(); ok {
+	if live, _, ok := p.live(); ok && (p.Account == nil || !p.Account.magpieList) {
 		if p.Account != nil && p.Account.unusable != nil {
 			// a model the list offers that the account was refused
 			// (Copilot's, copilot_refused.go)
@@ -935,21 +935,66 @@ var makerCatalogs = sync.OnceValue(func() []string {
 // it, else as its maker's does (#224): a subscription (Codex's ChatGPT
 // account, Copilot) or a relay with no models.dev id of its own is priced
 // at gpt-6-astra's or gemini-3.8-flash's maker's price, as a Claude
-// account is at Anthropic's.
+// account is at Anthropic's. A remote magpie's is what that magpie counts
+// the model at, as its list says (remotePrice).
 func (p Provider) ListPrice(model string) (catalog.Price, bool) {
+	if pr, ok := p.remotePrice(model); ok {
+		return pr, true
+	}
 	if p.clineFreeModel(model) || p.kiloFreeModel(model) {
 		// served at no cost: not at the price of the model it is free of
 		return catalog.Price{}, true
 	}
-	for _, m := range pricedNames(model) {
-		if pr, ok := catalog.PricedBy(p.Catalogs(), m); ok {
+	names := pricedNames(model)
+	if p.kimiCodeMember() {
+		if id, ok := kimiCodeAPI[strings.ToLower(strings.TrimSpace(model))]; ok {
+			names = append(names, id)
+		}
+	}
+	for _, m := range names {
+		if pr, ok := catalog.PricedBy(priceCatalogs(p.Catalogs()), m); ok {
 			return pr, true
 		}
-		if pr, ok := catalog.PricedBy(makerCatalogs(), m); ok {
+		if pr, ok := catalog.PricedBy(makerPriceCatalogs(), m); ok {
 			return pr, true
 		}
 	}
 	return catalog.Price{}, false
+}
+
+// membershipCatalogs are models.dev catalogs of a membership's own
+// endpoints that list every model at $0: what the membership charges per
+// token, not what the model costs (#1370, maicent: the Usage page counted
+// 937K tokens of Kimi Code's kimi-for-coding at ¥0.000). No price is read
+// from them, so a call there is priced at its model's API price, as a
+// Claude or Codex account's is, or left unpriced when it has none.
+var membershipCatalogs = []string{"kimi-code-plan-global", "kimi-code-plan-cn"}
+
+// priceCatalogs are cs without the membershipCatalogs.
+func priceCatalogs(cs []string) []string {
+	return slices.DeleteFunc(slices.Clone(cs), func(c string) bool { return slices.Contains(membershipCatalogs, c) })
+}
+
+var makerPriceCatalogs = sync.OnceValue(func() []string { return priceCatalogs(makerCatalogs()) })
+
+// kimiCodeMember is whether p is served at a Kimi Code membership's
+// endpoints, by its catalog.
+func (p Provider) kimiCodeMember() bool {
+	return slices.ContainsFunc(p.Catalogs(), func(c string) bool { return slices.Contains(membershipCatalogs, c) })
+}
+
+// kimiCodeAPI is the Kimi API model a Kimi Code model id is, as Kimi
+// Code's docs name it (https://www.kimi.com/code/docs/en/, 2026-10-09):
+// k3 is K3, k3-256k "K3 256K context version … the same results as K3",
+// kimi-for-coding-highspeed "K2.7 Code HighSpeed". Kimi's API prices both
+// per token (https://platform.kimi.ai/docs/pricing/chat: kimi-k3 $3 in,
+// $15 out, $0.30 cached; kimi-k2.7-code-highspeed $1.90, $8, $0.38).
+// kimi-for-coding is "K2.8 Preview", which the API doesn't sell, so it has
+// no API price and stays unpriced.
+var kimiCodeAPI = map[string]string{
+	"k3":                        "kimi-k3",
+	"k3-256k":                   "kimi-k3",
+	"kimi-for-coding-highspeed": "kimi-k2.7-code-highspeed",
 }
 
 // MakerPrice is a model's list price as the first vendor among the presets
@@ -957,7 +1002,7 @@ func (p Provider) ListPrice(model string) (catalog.Price, bool) {
 // gone since.
 func MakerPrice(model string) (catalog.Price, bool) {
 	for _, m := range pricedNames(model) {
-		if pr, ok := catalog.PricedBy(makerCatalogs(), m); ok {
+		if pr, ok := catalog.PricedBy(makerPriceCatalogs(), m); ok {
 			return pr, true
 		}
 	}
@@ -1016,6 +1061,29 @@ func EffectivePriceIn(s settings.Settings, providerID, model string) (catalog.Pr
 		pr = pr.Times(p.PriceRate)
 	}
 	return pr, ok
+}
+
+// EntryPriceIn is what a call to an entry of the catalog costs the user,
+// as the usage pages count it: its model's EffectivePriceIn, or a group's
+// when every member costs the same, none in a fast mode, since which of
+// them answers isn't known beforehand. find is GroupFinder's.
+func EntryPriceIn(st settings.Settings, find func(string) (Group, []Member, bool), e Entry) (catalog.Price, bool) {
+	if e.Group == "" {
+		return EffectivePriceIn(st, e.Provider.ID, e.Model)
+	}
+	_, ms, ok := find(e.ID)
+	if !ok || len(ms) == 0 {
+		return catalog.Price{}, false
+	}
+	var first catalog.Price
+	for i, m := range ms {
+		pr, ok := EffectivePriceIn(st, m.Provider.ID, m.Model)
+		if !ok || m.Fast || i > 0 && !pr.Same(first) {
+			return catalog.Price{}, false
+		}
+		first = pr
+	}
+	return first, true
 }
 
 // PriceRateOK says what is wrong with a provider's price rate, "" when
@@ -1079,11 +1147,22 @@ func pricedNames(model string) []string {
 func PricedName(model string) string {
 	n := pricedNames(model)
 	for _, name := range n {
-		if _, ok := catalog.PricedBy(makerCatalogs(), name); ok {
+		if _, ok := catalog.PricedBy(makerPriceCatalogs(), name); ok {
 			return name
 		}
 	}
 	return n[len(n)-1]
+}
+
+// PricedNameFor is PricedName for a call to that provider: a Kimi Code
+// membership's k3 is priced as the API's kimi-k3 (kimiCodeAPI).
+func PricedNameFor(providerID, model string) string {
+	if p, ok := byIDOrWas(providerID); ok && p.kimiCodeMember() {
+		if id, ok := kimiCodeAPI[strings.ToLower(strings.TrimSpace(model))]; ok {
+			return id
+		}
+	}
+	return PricedName(model)
 }
 
 // Chosen reports whether a model is exposed.
@@ -1184,12 +1263,13 @@ func providerEntries() []Entry {
 func buildEntries() []Entry {
 	var out []Entry
 	s := settings.Load()
+	gone := retiredNow() // its vendor said it is retired (retired.go)
 	for _, p := range All() {
 		if !p.On() || p.DecideOnly() { // a dedicated decision API only routes
 			continue
 		}
 		for _, m := range p.Exposed() {
-			if !p.DecidesModel(m.ID) {
+			if !p.isDecision(m) && !gone[p.ID+"/"+m.ID] {
 				out = append(out, entryFor(p, m, s))
 			}
 		}
@@ -1284,7 +1364,12 @@ func entryIn(entries []Entry, id string) (Entry, bool) {
 
 // Resolve maps an id an agent sent to a provider and the vendor's model id.
 // It accepts catalog ids, "provider/model" for any model (exposed or not),
-// and the bare model id when exactly one provider serves it.
+// and a bare model id: the first provider in the Providers order (All)
+// that exposes it, else the one provider that lists it unexposed. The
+// gateway asks GroupFor first, so with found groups on a bare id several
+// providers serve is that group, its members in the same order (MOMO on
+// Discord: glm-5.3 under opencode-go and a6api). magpie writes only
+// provider/model ids into agents' configs, so a bare one is the user's.
 // A group's id resolves to its first member.
 func Resolve(id string) (Provider, string, bool) {
 	// Claude Code's mark for a model with a 1M window; it drops it before
@@ -1425,6 +1510,26 @@ func (p Provider) replyLimit(m catalog.Model, s settings.Settings) int {
 	}
 	return output
 }
+
+// OutputWithin is a reply limit as it is published beside a window: kept
+// within it. models.dev lists some models' output above the window their
+// vendor's own list gives (Grok's grok-4.7: 500000 against the 256000 its
+// backend says, #1438; deepseek-chat's 384000 against 128000, #338), and a
+// client that reads both sizes its replies past what the window holds. An
+// unknown window or output is left as it is. Every place that hands out the
+// pair uses it — the agents' files, the gateway's model lists, the GUI and
+// the CLI — while a request is still lowered only to the model's own limit
+// (Entry.Output, withMaxOutput).
+func OutputWithin(window, output int) int {
+	if window > 0 && output > window {
+		return window
+	}
+	return output
+}
+
+// PublishedOutput is e's reply limit as it is handed out beside its window
+// (OutputWithin).
+func (e Entry) PublishedOutput() int { return OutputWithin(e.Context, e.Output) }
 
 func outputOf(s settings.Settings, providerID, model string) int {
 	if n := s.ModelOutputs[providerID+"/"+model]; n > 0 {

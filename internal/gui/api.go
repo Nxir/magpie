@@ -203,6 +203,9 @@ type agentJSON struct {
 	// Joined: connected with its own models still in its list (Codex
 	// signed in with ChatGPT, agent.Agent.Join)
 	Joined bool `json:"joined,omitempty"`
+	// Failover: not connected, yet its requests go through magpie for
+	// account failover alone (agent.Agent.FailingOver, #1385)
+	Failover bool `json:"failover,omitempty"`
 	// CLIMissing: its settings are here, its CLI isn't (#843), which
 	// the row says, and Install another agent offers it again
 	CLIMissing bool               `json:"cliMissing,omitempty"`
@@ -996,22 +999,24 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 		// its own. The per-model maps are carried whole rather than named one
 		// by one, so a map added later is not silently dropped here.
 		//
-		// HiddenModels and OrderedModels are the other way round — keyed by
-		// agent, not by "<provider>/<model>" — so they are not among them,
-		// and belong to the Agents page.
+		// HiddenModels, PickedModels and OrderedModels are the other way
+		// round — keyed by agent, not by "<provider>/<model>" — so they are
+		// not among them, and belong to the Agents page.
 		in.Visible, in.HiddenModels, in.OrderedModels = cur.Visible, cur.HiddenModels, cur.OrderedModels
+		in.PickedModels = cur.PickedModels     // "only models I pick" (#1337)
 		in.FastPicks = cur.FastPicks           // switched in the agents' pickers (#954)
 		in.AgentEfforts = cur.AgentEfforts     // picked in an agent's row (#1003)
 		in.PluginCheckins = cur.PluginCheckins // set on its own (plugin-checkin below)
 		settings.CarryPerModel(&in, &cur)
 		in.LAN, in.LANKey = cur.LAN, cur.LANKey
 		in.LANKeyID = cur.LANKeyID
-		in.Port = cur.Port                               // set on its own (port below), which moves the gateway
-		in.CORSOrigins = cur.CORSOrigins                 // set on its own (cors below)
-		in.GitHubToken = cur.GitHubToken                 // set on its own (github-token below), never sent to the page
-		in.RequestArchive = cur.RequestArchive           // the Gateway page's, set on its own
-		in.RequestArchiveMaxMB = cur.RequestArchiveMaxMB // in settings.json only
-		in.RedactRules = cur.RedactRules                 // the masking rules, set on their own
+		in.Port = cur.Port                                 // set on its own (port below), which moves the gateway
+		in.CORSOrigins = cur.CORSOrigins                   // set on its own (cors below)
+		in.GitHubToken = cur.GitHubToken                   // set on its own (github-token below), never sent to the page
+		in.RequestArchive = cur.RequestArchive             // the Gateway page's, set on its own
+		in.RequestArchiveMaxMB = cur.RequestArchiveMaxMB   // in settings.json only
+		in.GatewayConversations = cur.GatewayConversations // Sessions' explicit recording consent
+		in.RedactRules = cur.RedactRules                   // the masking rules, set on their own
 		// used or left is the Usage page's toggle as much as Settings', set on its own
 		in.QuotaLeft = cur.QuotaLeft
 		in.UsageOrder = cur.UsageOrder // the Usage page's, dragged there
@@ -1028,6 +1033,8 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 		in.CodexTitles = cur.CodexTitles // set on its own (codex-titles below)
 		// and so is the model Codex's auto-review runs on (codex-auto-review)
 		in.CodexAutoReview = cur.CodexAutoReview
+		// and the model Codex's subagents are put on, set in Codex's row
+		in.CodexSubagentModel = cur.CodexSubagentModel
 		in.ChinaMirror = cur.ChinaMirror // the Plugins page's, set on its own
 		// which Codex accounts spend a reset by themselves, set on the Usage card
 		in.CodexAutoReset = cur.CodexAutoReset
@@ -1726,6 +1733,7 @@ func state() stateJSON {
 			aj.Joined = a.Joined != nil && a.Joined()
 		} else {
 			aj.Source = a.Source()
+			aj.Failover = a.FailingOver != nil && a.FailingOver()
 		}
 		if a.Import != nil {
 			aj.Import, aj.Added = a.Import(), a.Added != nil && a.Added()

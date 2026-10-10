@@ -12,9 +12,12 @@ import (
 )
 
 // fetchPartnersNow fetches the list as the background refresh does, and
-// waits for it.
+// waits for it. One fetch runs at a time, as Partners and PartnersNow
+// keep it: a fetch Partners started is waited for first, so it can't
+// store an older list over this one.
 func fetchPartnersNow() {
-	partnerMu.Lock()
+	claimPartnerFetch()
+	partnerFetches = true
 	loadPartners()
 	partnerMu.Unlock()
 	refreshPartners()
@@ -125,6 +128,52 @@ func TestPartnersFromTheFeed(t *testing.T) {
 	fetchPartnersNow()
 	if ids := partnerIDs(Partners()); ids != "acme" {
 		t.Fatalf("partners after a failed fetch = %q, want acme", ids)
+	}
+}
+
+// A list fetched after the one Partners started behind the call is the
+// list held, however late the earlier fetch answers.
+func TestPartnersFetchedLastIsHeld(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	resetPartners()
+	t.Cleanup(resetPartners)
+	var body atomic.Value
+	body.Store(`{"partners":[{"id":"acme","name":"Acme","chat":"https://a.example/v1"}]}`)
+	var asked atomic.Int32
+	release, served := make(chan struct{}), make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		b := body.Load().(string)
+		if asked.Add(1) == 1 {
+			// the fetch Partners starts read the list before it changed,
+			// and answers late
+			<-release
+			defer close(served)
+		}
+		_, _ = rw.Write([]byte(b))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MAGPIE_PARTNERS", srv.URL)
+
+	Partners()
+	for deadline := time.Now().Add(5 * time.Second); asked.Load() == 0; {
+		if time.Now().After(deadline) {
+			t.Fatal("Partners started no fetch")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	body.Store(`{"partners":[]}`)
+	go func() { time.Sleep(50 * time.Millisecond); close(release) }()
+	fetchPartnersNow()
+	<-served
+	// the earlier fetch has answered; give it the time to store its list
+	for deadline := time.Now().Add(300 * time.Millisecond); time.Now().Before(deadline); {
+		if got := Partners(); len(got) != 0 {
+			t.Fatalf("partners after the list emptied = %s", partnerIDs(got))
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if n := asked.Load(); n != 2 {
+		t.Fatalf("asked %d times, want 2", n)
 	}
 }
 

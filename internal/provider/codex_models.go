@@ -411,16 +411,19 @@ func CodexCatalog(shown []Entry) []catalog.Model {
 }
 
 // CodexNativeHidden is the ChatGPT account's own model slugs the user took
-// out of Codex's list (HiddenModels): the backend lists them, and the
-// gateway drops them from its /models answer as it does the ones not picked.
+// out of Codex's list (HiddenModels), or didn't pick for it when it is
+// shown only the models picked (PickedModels): the backend lists them, and
+// the gateway drops them from its /models answer as it does the ones not
+// picked.
 func CodexNativeHidden() map[string]bool {
-	off := HiddenModels("codex")
-	if len(off) == 0 {
+	_, only := PickedModels("codex")
+	if !only && len(HiddenModels("codex")) == 0 {
 		return nil
 	}
+	off := ModelOff("codex")
 	out := map[string]bool{}
 	for _, e := range Catalog() {
-		if off[e.ID] && CodexOwn(e) {
+		if CodexOwn(e) && off(e.ID) {
 			out[e.Model] = true
 		}
 	}
@@ -462,7 +465,15 @@ func CodexOrder() (map[string]int, bool) {
 // the account's own taken out of it, the order they are in, the windows set on them, the auto-review model, and whether its OpenAI models say
 // multi-agent V1 (settings.CodexAgentsV1), so any of them changing has
 // Codex ask for the list again.
-func CodexListTag() string {
+func CodexListTag() string { return codexListTag("") }
+
+// CodexOwnListTag names the list a Codex that reaches magpie for account
+// failover alone is handed, its own models without magpie's (#1385). Neither
+// it nor CodexListTag's is a part of the other, so Codex asks again when it
+// moves from one list to the other; a V1 list's mark stays in front.
+func CodexOwnListTag() string { return codexListTag("own") }
+
+func codexListTag(kind string) string {
 	ms := CodexListed()
 	off := slices.Sorted(maps.Keys(CodexNativeHidden()))
 	for _, slug := range off {
@@ -482,7 +493,7 @@ func CodexListTag() string {
 	if v := settings.Load().CodexAutoReview; v != "" {
 		ms = append(ms, catalog.Model{ID: "~autoreview:" + v})
 	}
-	return codexcat.PolicyTag(codexcat.Tag(ms))
+	return codexcat.PolicyTag(kind + codexcat.Tag(ms))
 }
 
 // CodexNativePicked is the set of the ChatGPT account's own model slugs the
@@ -566,6 +577,9 @@ func codexListed(shown []Entry, members func(id string) []Member, own bool) []ca
 		}
 		m := catalog.Model{ID: e.ID, Name: labels[i], Efforts: e.Efforts, Images: e.Images || seen, Context: e.Context, AgentsV2: e.AgentsV2}
 		m.Compact = compactSet(s, e.ID, find)
+		// a provider the user added by its address is sent the tier Codex
+		// asks for as it is (hsiangron on X)
+		m.OwnTier = e.Group == "" && e.Provider.Preset == "" && e.Provider.Account == nil && e.Provider.ID != ""
 		if e.Group != "" {
 			for _, mb := range members(e.ID) {
 				if a := mb.Provider.Account; a != nil && a.Agent == "codex" && strings.HasPrefix(mb.Model, "gpt-") {

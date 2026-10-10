@@ -103,6 +103,9 @@ type Settings struct {
 	// RequestArchiveMaxMB is how much of each body the archive keeps, in
 	// MiB: 0 for 32, at most 1024 (#447)
 	RequestArchiveMaxMB int `json:"requestArchiveMaxMB,omitempty"`
+	// GatewayConversations is local, opt-in recording of session traffic.
+	// Only SetGatewayConversations changes it; other saves keep local consent.
+	GatewayConversations bool `json:"gatewayConversations,omitempty"`
 	// CodexWarmup starts a ChatGPT account's next window as soon as the
 	// last one resets, with one tiny request, so it counts from then (a
 	// Codex window starts at its first use): "" off, "week" the weekly
@@ -172,6 +175,10 @@ type Settings struct {
 	// usage by the reply's model (#822). Claude Code, Claude Desktop and
 	// Codex always get the vendor's name: they read it themselves.
 	MemberModel bool `json:"memberModel,omitempty"`
+	// NoLoopGuard lets a streamed reply run on when its reasoning or text
+	// is stuck in a loop of the same few lines (#1359). Off, as by
+	// default, the gateway ends such a reply with an error.
+	NoLoopGuard bool `json:"noLoopGuard,omitempty"`
 	// NoStats stops the one event a day that counts magpie's users (see
 	// internal/stats).
 	NoStats bool `json:"noStats,omitempty"`
@@ -307,6 +314,13 @@ type Settings struct {
 	// codex-auto-review or the conversation's model at low effort. ""
 	// leaves the list as it was.
 	CodexAutoReview string `json:"codexAutoReview,omitempty"`
+	// CodexSubagentModel is the model the gateway puts every subagent
+	// Codex spawns on (a request x-openai-subagent names collab_spawn),
+	// whatever model its lead asked for in spawn_agent: a model a ChatGPT
+	// account in magpie serves (provider/model), since a subagent's task
+	// is sealed for one (willz on Discord). "" leaves each on the model its
+	// lead asked for.
+	CodexSubagentModel string `json:"codexSubagentModel,omitempty"`
 	// FullContext has Codex and Claude Code told a model's whole context
 	// window. Off, a window above WorkingWindow is told as WorkingWindow,
 	// so they compact a long conversation there instead of sending ever
@@ -365,6 +379,12 @@ type Settings struct {
 	// or a group's) taken out of an agent's lists one by one, by agent id,
 	// after Visible: a model not named here, a new one among them, is shown.
 	HiddenModels map[string][]string `json:"hiddenModels,omitempty"`
+	// PickedModels, for an agent it names, are the only catalog entries its
+	// lists show, after Visible (#1337): the user switched the agent to
+	// "only models I pick", so a model that comes later, of a new provider
+	// or an old one, is not shown until it is ticked. HiddenModels is not
+	// read for such an agent. An agent named with no entries is shown none.
+	PickedModels map[string][]string `json:"pickedModels,omitempty"`
 	// AgentEfforts are the reasoning efforts the gateway asks for on an
 	// agent's requests, by agent id, for an agent whose own config can't
 	// carry one (Cursor Private Inference, #1003): one of the levels in
@@ -730,6 +750,7 @@ func (s Settings) Compact() int {
 // icon (yoooo on Discord: usage turned off on a Mac came back from a
 // Windows box that shows it).
 func (s *Settings) KeepOwn(cur Settings) {
+	s.GatewayConversations = cur.GatewayConversations
 	s.UIFont, s.CodeFont = cur.UIFont, cur.CodeFont
 	s.Window, s.Proxy, s.Port, s.Dock, s.DockWindow, s.Lightweight = cur.Window, cur.Proxy, cur.Port, cur.Dock, cur.DockWindow, cur.Lightweight
 	s.WindowMaximised, s.KeepAwake, s.KeepAwakeDisplay = cur.WindowMaximised, cur.KeepAwake, cur.KeepAwakeDisplay
@@ -794,6 +815,11 @@ var fileMu sync.RWMutex
 func Load() Settings {
 	fileMu.RLock()
 	defer fileMu.RUnlock()
+	return load()
+}
+
+// load is called with fileMu held for reading or writing.
+func load() Settings {
 	var s Settings
 	// read again only once the file changed: a look at the agents asks for
 	// the settings for every model of every agent (hundreds of reads, a
@@ -859,10 +885,25 @@ func SavedAddr() string {
 	return fmt.Sprintf("127.0.0.1:%d", p)
 }
 
-// Save validates and writes the settings.
+// Save validates and writes the settings, preserving current recording consent.
 func Save(s Settings) error {
 	fileMu.Lock()
 	defer fileMu.Unlock()
+	return save(s, false)
+}
+
+// SetGatewayConversations changes local recording consent without overwriting
+// other settings from an earlier snapshot.
+func SetGatewayConversations(on bool) error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+	s := load()
+	s.GatewayConversations = on
+	return save(s, true)
+}
+
+// save is called under fileMu. Only the consent setter may replace recording.
+func save(s Settings, recording bool) error {
 	defer filememo.Forget() // read again, where a request holds it
 	s = s.normal()
 	if !slices.Contains(Themes, s.Theme) {
@@ -947,6 +988,10 @@ func Save(s Settings) error {
 	if s.CodexAutoReview != "" && !strings.Contains(s.CodexAutoReview, "/") {
 		return fmt.Errorf("the model for Codex's auto-review must be a model's id such as openai/gpt-5-mini, not %q", s.CodexAutoReview)
 	}
+	s.CodexSubagentModel = strings.TrimSpace(s.CodexSubagentModel)
+	if s.CodexSubagentModel != "" && !strings.Contains(s.CodexSubagentModel, "/") {
+		return fmt.Errorf("the model for Codex's subagents must be a model's id such as codex/gpt-5.5, not %q", s.CodexSubagentModel)
+	}
 	s.Searcher = strings.TrimSpace(s.Searcher)
 	if s.SearchFirst = strings.TrimSpace(s.SearchFirst); s.SearchFirst == SearchFirstModel {
 		s.SearchFirst = ""
@@ -981,6 +1026,7 @@ func Save(s Settings) error {
 	}
 	// Load may have returned defaults or only part of an unreadable file.
 	// Do not replace it, including its permissions, with those values.
+	consent := false
 	if b, err := steady.ReadFile(Path()); err == nil {
 		b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
 		if len(bytes.TrimSpace(b)) != 0 {
@@ -988,9 +1034,13 @@ func Save(s Settings) error {
 			if err := json.Unmarshal(b, &stored); err != nil {
 				return fmt.Errorf("could not read settings at %s; repair or move that file aside before saving: %w", Path(), err)
 			}
+			consent = stored.GatewayConversations
 		}
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("could not read settings at %s: %w", Path(), err)
+	}
+	if !recording {
+		s.GatewayConversations = consent
 	}
 	if err := os.MkdirAll(Dir(), 0o755); err != nil {
 		return err
