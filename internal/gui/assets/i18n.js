@@ -4,6 +4,8 @@
 // works. {name} slots are filled by t(str, vars).
 const I18N = {
   zh: {
+    "Show details": "展开详情",
+    "Hide details": "收起详情",
     "Manage": "管理",
     "Manage agents": "批量管理",
     "Hiding only changes this list, not an agent's connection or settings. Unhidden agents may stay under Not set up.": "隐藏只改变列表显示，不影响 Agent 的接入或设置。取消隐藏后，Agent 仍可能留在「未设置」中。",
@@ -4595,6 +4597,8 @@ const I18N = {
     "~/.dsh/settings.yaml sets its own DeepSeek endpoint or key, which dsh puts over magpie's; clear it in dsh's Models page to go through magpie.": "~/.dsh/settings.yaml 设置了自己的 DeepSeek 地址或 Key，dsh 会优先用它而不是 magpie 的；请在 dsh 的 Models 页面清除它，才能走 magpie。",
   },
   "zh-TW": {
+    "Show details": "展開詳情",
+    "Hide details": "收起詳情",
     "Codex thread descriptions": "Codex 對話描述",
     "Description": "描述",
     "Manage": "管理",
@@ -9169,6 +9173,8 @@ const I18N = {
     "~/.dsh/settings.yaml sets its own DeepSeek endpoint or key, which dsh puts over magpie's; clear it in dsh's Models page to go through magpie.": "~/.dsh/settings.yaml 設定了自己的 DeepSeek 位址或 Key，dsh 會優先用它而不是 magpie 的；請在 dsh 的 Models 頁面清除它，才能走 magpie。",
   },
   ja: {
+    "Show details": "詳細を表示",
+    "Hide details": "詳細を隠す",
     "Manage": "管理",
     "Manage agents": "エージェントを一括管理",
     "Hiding only changes this list, not an agent's connection or settings. Unhidden agents may stay under Not set up.": "非表示は一覧の表示のみを変更し、エージェントの接続や設定には影響しません。非表示を解除しても「未設定」に残る場合があります。",
@@ -13745,6 +13751,8 @@ const I18N = {
     "~/.dsh/settings.yaml sets its own DeepSeek endpoint or key, which dsh puts over magpie's; clear it in dsh's Models page to go through magpie.": "~/.dsh/settings.yaml に独自の DeepSeek エンドポイントやキーがあり、dsh は magpie のものよりそちらを優先します。magpie を経由するには dsh の Models ページで消してください。",
   },
   de: {
+    "Show details": "Details anzeigen",
+    "Hide details": "Details ausblenden",
     "Manage": "Verwalten",
     "Manage agents": "Agents verwalten",
     "Hiding only changes this list, not an agent's connection or settings. Unhidden agents may stay under Not set up.": "Ausblenden ändert nur die Liste, nicht die Verbindung oder Einstellungen eines Agents. Nach dem Einblenden können Agents unter „Nicht eingerichtet“ bleiben.",

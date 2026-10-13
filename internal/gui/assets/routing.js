@@ -70,6 +70,23 @@
   const log = el("div", "rt-log");
   const logHead = el("div", "rt-log-head");
   const steps = el("ol", "rt-steps");
+  steps.id = "rtRequestStory";
+  const storyToggle = el("button", "text rt-story-toggle");
+  storyToggle.type = "button";
+  storyToggle.setAttribute("aria-controls", steps.id);
+  storyToggle.dataset.unrolls = "";
+  let storyOpen = true;
+  try { storyOpen = localStorage.getItem("magpie.routingDetails") !== "0"; } catch {}
+  function storyDisclosure() {
+    steps.hidden = !storyOpen;
+    storyToggle.textContent = t(storyOpen ? "Hide details" : "Show details");
+    storyToggle.setAttribute("aria-expanded", String(storyOpen));
+  }
+  storyToggle.onclick = () => {
+    storyOpen = !storyOpen;
+    try { localStorage.setItem("magpie.routingDetails", storyOpen ? "1" : "0"); } catch {}
+    steady(() => { storyDisclosure(); if (logR) holdStory(); });
+  };
   // what the request's prompt held: its context window (context.js)
   const ctxBox = el("div", "rt-ctx");
   log.append(logHead, steps, ctxBox);
@@ -1627,6 +1644,8 @@
         logHead.append(live);
       }
     }
+    storyDisclosure();
+    if (!storyToggle.isConnected) logHead.append(storyToggle);
     renderSteps(r);
     holdStory();
     renderCtx(r);
@@ -1646,7 +1665,7 @@
   function holdStory() {
     const follow = !pinned && !rp && !day;
     const w = steps.clientWidth;
-    const key = JSON.stringify([follow, w, document.documentElement.lang]);
+    const key = JSON.stringify([follow, w, document.documentElement.lang, storyOpen]);
     if (key === storyHold.key && storyDrawn === headKey + stepsKey) return;
     if (key !== storyHold.key) storyHold = { key, h: [0, 0] };
     storyDrawn = headKey + stepsKey;
