@@ -133,6 +133,10 @@
 .rt-steps li.ok::before { background: var(--green); }
 .rt-steps li.bad::before { background: var(--red); }
 .rt-steps li.wait::before { animation: rtlive 1.8s infinite; }
+.rt-log-head { flex-wrap: wrap; gap: 4px 8px; }
+.rt-story-toggle { flex: none; }
+.rt-story-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#view-routing > .row-head, #view-routing > .rt { flex-shrink: 0; }
 .rt-off { padding: 18px 4px; text-align: center; color: var(--muted); font-size: 13px; }
 @media (prefers-reduced-motion: reduce) {
   .rt-accts li.on .dot, .rt-wires path.live, .rt-sky .pkt.held, .rt-accts li.new, .rt-accts li.hit, .rt-hub.tick, .rt-src.tick, .rt-cap.in, .rt-steps li.wait::before, .masking .pii { animation: none; }
