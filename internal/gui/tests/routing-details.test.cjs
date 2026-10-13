@@ -196,7 +196,10 @@ for (const engine of process.env.BROWSER ? [process.env.BROWSER] : ['chromium', 
         assert.equal(await page.locator('.rt-brief-path code').count(), 1, 'the provider-prefixed model alias is not repeated');
         assert.equal((await page.locator('.rt-story').innerText()).split(account.model).length - 1, 1, 'the routine request names its model once');
         await send(request(104, { ms: 7100 }));
-        assert.match(await page.locator('.rt-brief .duration .v').innerText(), /7\.1/, 'new requests still update the opened story; pinning is a separate change');
+        assert.match(await page.locator('.rt-brief .duration .v').innerText(), /5\.9/, 'opened details keep their request when a newer call arrives');
+        await page.locator('.rt-log-head button', { hasText: await page.evaluate(() => t('Back to live')) }).click();
+        await page.waitForFunction(() => document.querySelector('.rt-brief .duration .v')?.textContent.includes('7.1'));
+        assert.match(await page.locator('.rt-brief .duration .v').innerText(), /7\.1/, 'returning live selects the newer call');
         await page.reload();
         await page.locator('.rt-ctx .ctx-waffle').waitFor();
         assert.equal(await toggle.getAttribute('aria-expanded'), 'true', 'reload keeps context open');

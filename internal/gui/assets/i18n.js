@@ -4,6 +4,10 @@
 // works. {name} slots are filled by t(str, vars).
 const I18N = {
   zh: {
+    "Viewing request": "正在查看请求",
+    "1 new request": "1 个新请求",
+    "{n} new requests": "{n} 个新请求",
+    "Newer requests in this list": "当前列表中更晚的请求",
     "Selected account": "所选账号",
     "Only one account is enabled for this model.": "此模型只启用了一个账号。",
     "Current routing policy": "当前路由策略说明",
@@ -3802,6 +3806,10 @@ const I18N = {
     "credits": "积分",
   },
   "zh-TW": {
+    "Viewing request": "正在查看請求",
+    "1 new request": "1 個新請求",
+    "{n} new requests": "{n} 個新請求",
+    "Newer requests in this list": "目前列表中較新的請求",
     "Selected account": "所選帳號",
     "Only one account is enabled for this model.": "此模型只啟用了一個帳號。",
     "Current routing policy": "目前路由策略說明",
@@ -7583,6 +7591,10 @@ const I18N = {
     "credits": "積分",
   },
   ja: {
+    "Viewing request": "リクエストを表示中",
+    "1 new request": "新しいリクエスト1件",
+    "{n} new requests": "新しいリクエスト{n}件",
+    "Newer requests in this list": "この一覧内のより新しいリクエスト",
     "Selected account": "選択したアカウント",
     "Only one account is enabled for this model.": "このモデルで有効なアカウントは1つだけです。",
     "Current routing policy": "現在のルーティング方針",
@@ -11366,6 +11378,10 @@ const I18N = {
     "Main navigation": "メインナビゲーション",
   },
   de: {
+    "Viewing request": "Anfrage wird angezeigt",
+    "1 new request": "1 neue Anfrage",
+    "{n} new requests": "{n} neue Anfragen",
+    "Newer requests in this list": "Neuere Anfragen in dieser Liste",
     "Selected account": "Gewähltes Konto",
     "Only one account is enabled for this model.": "Für dieses Modell ist nur ein Konto aktiviert.",
     "Current routing policy": "Aktuelle Routing-Strategie",
