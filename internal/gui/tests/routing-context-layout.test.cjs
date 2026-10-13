@@ -26,7 +26,7 @@ function serve(lang, feed) {
     if (url.pathname === '/wails/runtime.js') return r.fulfill({ contentType: 'text/javascript', body: 'export const Window={};' });
     if (url.pathname === '/api/state') return json({ agents: [{ id: 'codex', name: 'Codex', fields: [] }], profiles: [], settings: { lang, theme: 'dark' } });
     if (url.pathname === '/api/gateway/trace') {
-      if (!url.searchParams.has('wait')) feed.count = 1;
+      if (!url.searchParams.has('wait')) { feed.count = 1; feed.next = null; }
       const routes = url.searchParams.has('wait') ? await new Promise((resolve) => { feed.next = resolve; }) : [request(100)];
       return json({ mine: true, now, seq: routes[0]?.id || 100, totals: { requests: 1, rerouted: 0, errors: 0 }, routes });
     }
@@ -93,6 +93,19 @@ for (const engine of process.env.BROWSER ? [process.env.BROWSER] : ['chromium', 
         await page.reload();
         await page.locator('.ctx-waffle').waitFor();
         assert.equal(await page.locator('.rt-ctx-toggle').getAttribute('aria-expanded'), 'true', 'reload restores the preference');
+        if (width === 900) {
+          for (let i = 0; i < 60 && !feed.next; i++) await page.waitForTimeout(50);
+          assert.ok(feed.next, 'the next trace request is waiting');
+          const next = feed.next; feed.next = null;
+          next([request(101, { done: false, prompt: undefined, usage: [], tries: [] })]);
+          await page.waitForFunction(() => document.querySelectorAll('.rt-req').length === 2);
+          await page.locator('.rt-ctx-toggle').click();
+          assert.equal(await page.locator('.rt-ctx').isVisible(), true, 'a disclosure keeps the carried context while the new prompt is being read');
+          assert.equal(await page.locator('.ctx-waffle').count(), 0);
+          await page.locator('.rt-ctx-toggle').click();
+          await page.locator('.ctx-waffle').waitFor();
+          assert.equal(await page.locator('.rt-ctx-toggle').getAttribute('aria-expanded'), 'true');
+        }
         assert.deepEqual(errors, []);
       });
     }

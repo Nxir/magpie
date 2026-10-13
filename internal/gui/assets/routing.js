@@ -1697,11 +1697,12 @@
   // ctxFor is a request opened to see its context window (the Usage
   // page's Context tab): its card shows unfolded, it alone, whatever the
   // reader keeps folded
-  let ctxKey = "", ctxShown = 0, ctxTab = "all", ctxFor = 0;
+  let ctxKey = "", ctxShown = 0, ctxTab = "all", ctxFor = 0, ctxCarry = null;
   function hideCtx() {
     ctxBox.hidden = true;
     box.classList.remove("has-context");
     ctxKey = "";
+    ctxCarry = null;
     ctxDetail.replaceChildren();
     ctxShown = 0;
   }
@@ -1714,14 +1715,16 @@
     ctxDetail.hidden = !open;
     // Keep the last live context in place while the next prompt is read,
     // including the closed summary. A deliberately picked request is fresh.
-    if (!r.prompt && !r.done && !pinned && !ctxBox.hidden && ctxKey) return;
+    if (!r.prompt && !r.done && !pinned && !ctxBox.hidden && ctxCarry) r = ctxCarry;
     ctxBox.hidden = !r.prompt || !window.ctxCard;
     box.classList.toggle("has-context", !ctxBox.hidden);
     if (ctxBox.hidden) {
       ctxKey = "";
+      ctxCarry = null;
       ctxDetail.replaceChildren();
       return;
     }
+    ctxCarry = r;
     const sk = open ? sessionKey(r) : "";
     const same = (x) => x.prompt && x.agent === r.agent && !x.kind && (sk ? sessionKey(x) === sk : r.conv && x.conv === r.conv);
     const series = open && (sk || r.conv) && !r.kind ? listed().filter(same).sort((a, b) => a.id - b.id)

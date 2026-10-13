@@ -57,6 +57,8 @@ story's node and logo retention remain in use. An open card retains its
 cells and unchanged rows while a new prompt arrives. The fixed grid row
 height bounds the space used by unused tokens. Usage context cards keep
 their existing header and layout.
+While a new live prompt is still being read, the carried context remains
+available for opening and closing without removing the card.
 
 See `routing-context-layout.test.cjs`, `routing-context-fold.test.cjs`,
 `routing-ctx-fold.test.cjs`, `routing-live-patch.test.cjs` and
