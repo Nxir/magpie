@@ -6,15 +6,6 @@ covers saving and reloading, escaped and non-UTF-8 credentials, masked
 addresses/status, clearing authentication, Tab and Escape, mode switches,
 HTTP compatibility, and narrow windows in English and Chinese on Chromium
 and WebKit.
-## Optional Routing request story
-
-`routing-story-toggle.test.cjs` checks an open-by-default story, explicit
-folding, keyboard controls, retained explanation nodes, persisted choice,
-new requests and readable failures after reopening. Both engines and all
-five languages run at desktop and narrow widths. `MAGPIE_STORY_ASSETS`
-selects base assets for a negative check. The upstream live logo regression
-is unchanged and verifies node identity across request phases.
-
 ## Installed desktop fonts
 
 `fonts.test.cjs` exercises the interface/code font controls with installed
@@ -2125,6 +2116,15 @@ compare the same completed API state rather than a loading-order difference.
 ```sh
 node --test internal/gui/tests/mobile-web.test.cjs internal/gui/tests/old-webkit.test.cjs
 ```
+
+## Optional Routing request story
+
+`routing-story-toggle.test.cjs` checks an open-by-default story, explicit
+folding, keyboard controls, retained explanation nodes, persisted choice,
+new requests and readable failures after reopening. Both engines and all
+five languages run at desktop and narrow widths. `MAGPIE_STORY_ASSETS`
+selects base assets for a negative check. The upstream live logo regression
+is unchanged and verifies node identity across request phases.
 
 ## Routing request metrics
 

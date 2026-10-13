@@ -32,21 +32,6 @@ three.
 
 ## Constraints and failure behavior
 
-### Optional Routing request story
-
-The full request story starts open, with the existing descriptive heading
-and visible stage caption. Its Show/Hide details button sits in the
-heading beside the existing actions. Closing explicitly hides the story;
-opening restores the same explanation and logo nodes. The choice is stored
-as `magpie.routingDetails` and survives incoming requests and reloads.
-Context folding remains independent. Live height reservation resets for an
-intentional disclosure change. The request is still updated live while
-open; inspecting a fixed request is a separate feature.
-
-The story still reports main's routing reasons, including informational
-notices without a failure, and keeps unchanged lines and provider icons.
-See `routing-story-toggle.test.cjs` and `routing-log-icons.test.cjs`.
-
 ### Streamed output speed
 
 Usage rows and aggregates use `Record.Decode` and `DecodeOf` in
@@ -91,6 +76,21 @@ OTel attributes carry the evidence without response text. The existing burst and
 `TestPricedRowKeepsReasoningEvidence`, `TestSummaryAfterEndpointFallbackStaysHidden` and
 [`reasoning-speed.test.cjs`](../../internal/gui/tests/reasoning-speed.test.cjs)
 cover the calculation, cache round trip, translated streams and both pages.
+
+### Optional Routing request story
+
+The full request story starts open, with the existing descriptive heading
+and visible stage caption. Its Show/Hide details button sits in the
+heading beside the existing actions. Closing explicitly hides the story;
+opening restores the same explanation and logo nodes. The choice is stored
+as `magpie.routingDetails` and survives incoming requests and reloads.
+Context folding remains independent. Live height reservation resets for an
+intentional disclosure change. The request is still updated live while
+open; inspecting a fixed request is a separate feature.
+
+The story still reports main's routing reasons, including informational
+notices without a failure, and keeps unchanged lines and provider icons.
+See `routing-story-toggle.test.cjs` and `routing-log-icons.test.cjs`.
 
 ### Routing purpose filter
 
