@@ -54,7 +54,7 @@ function serve(lang, feed) {
     if (url.pathname === "/api/gateway/history") return json({ cut: false, days: [{ day, requests: fixtures.length }], routes: url.searchParams.get("day") ? fixtures : [] });
     if (url.pathname === "/api/gateway/session-titles") return json({ "metrics-chat": "Request metrics" });
     if (url.pathname === "/api/groups") return json({ groups: [] });
-    if (url.pathname === "/api/providers") return json({ providers: [], gateway: { running: true, window: true } });
+    if (url.pathname === "/api/providers") return json({ providers: [], presets: [], excluded: [], gateway: { running: true, window: true } });
     if (url.pathname.startsWith("/api/")) return json({});
     const file = path.join(assets, url.pathname === "/" ? "index.html" : url.pathname);
     const contentType = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png" }[path.extname(file)];
@@ -141,7 +141,15 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert(boxes.meta.left >= boxes.to.right - 1 || boxes.meta.top >= boxes.to.bottom - 1, `metadata overlaps destination at ${width}px`);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `horizontal page overflow at ${width}px`);
         if (width === 480) {
-          await page.locator("#rtMetrics").click();
+          const pick = page.locator("#rtMetrics");
+          for (let i = 0; i < 20; i++) {
+            const box = await pick.boundingBox(), view = await page.locator("#view-routing").boundingBox();
+            if (box && box.y >= view.y && box.y + box.height <= view.y + view.height) break;
+            await page.mouse.move(width / 2, 450);
+            await page.mouse.wheel(0, box && box.y < view.y ? -250 : 250);
+            await page.waitForTimeout(100);
+          }
+          await pick.click();
           const menu = page.locator(".rt-metric-menu");
           const cost = menu.getByRole("menuitemcheckbox", { name: lang === "zh" ? "费用" : "Cost", exact: true });
           await cost.click();

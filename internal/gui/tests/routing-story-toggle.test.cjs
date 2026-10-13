@@ -1,4 +1,4 @@
-// The context header is lazy and stable; Routing keeps its full story.
+// Routing keeps its story open until the reader explicitly folds it.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
